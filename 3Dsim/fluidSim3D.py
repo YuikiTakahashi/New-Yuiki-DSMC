@@ -47,7 +47,7 @@ class vel_pdf(st.rv_continuous):
 vel_cv = vel_pdf(a=0, b=10**4, name='vel_pdf') # vel_cv.rvs() for value
 
 # Set coordinate-dependent ambient flow average velocities
-def ambientFlow(x, y, z, zFlow=0, xFlow=0, yFlow=0, aperture=False):
+def ambientFlow(x, y, z, zFlow=30, xFlow=0, yFlow=0, aperture=False):
     if aperture == True:
         r = (x**2+y**2)**0.5
         radFlow = -5*z*np.exp(-0.4*abs(5*z+1)) * 100 * r
@@ -84,14 +84,13 @@ def collide():
             (vx_amb*B*vy_amb/v_amb-vy_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb))\
             + np.cos(Theta)*vz_amb/v_amb))
 
-def getData(t1=500, t2=20000, step=500, trials=400, x0=0, y0=0, z0=0,\
-            vx0=0, vy0=0, vz0=0):
-    global vx, vy, vz, x, y, z
+def getData(t1=500, t2=20000, step=500, trials=400, x0=0, y0=0, z0=0, v0=0):
     '''
     For a variety of total time steps, determine the expected values of final position,
     square-distance, and path-averaged speed.
     '''
-    with open('_'.join(map(str,[t1, t2, step, int(vx0), int(vy0), int(vz0), int(ambientFlow(0, 0, 0)[0]), \
+    global vx, vy, vz, x, y, z
+    with open('_'.join(map(str,[t1, t2, step, int(v0),int(ambientFlow(0, 0, 0)[2]), \
                                 int(M/m), int(np.log10(float(n)))]))+'.dat', 'w') as f:
         f.write('   '.join(['time (s)','xAvg (m)','yAvg (m)', 'zAvg (m)', 'SqrAvg (sq. m)',\
                           'SpeedAvg (m/s)','sigX','sigY', 'sigZ', 'sigSqr','sigSpeed'])+'\n')
@@ -103,7 +102,11 @@ def getData(t1=500, t2=20000, step=500, trials=400, x0=0, y0=0, z0=0,\
             squares = []
             speedAvgs = []
             for j in range(trials):
-                x, y, z, vx, vy, vz = x0, y0, z0, vx0, vy0, vz0
+                x, y, z = x0, y0, z0
+                theta = theta_cv.rvs()
+                phi = np.random.uniform(0, 2*np.pi)
+                vx, vy, vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                                   *np.sin(phi), v0*np.cos(theta))
                 speeds = []
                 count = 0
                 while count < time:
@@ -212,11 +215,9 @@ def getImage(filename, vel=True):
 
 
 
-#getData(vx0=vMeanM)
+getData(vx0=vMeanM)
 
 
-# Examine diffusion/pumpout ratio
 # Relative velocity including VMeanM
 # Increased collision probability at high velocity (Bayes?)
-# Nonconstant flow
 # Theory of x(t) distribution by matrix exponentiation?
