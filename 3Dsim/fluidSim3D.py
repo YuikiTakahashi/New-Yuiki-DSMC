@@ -14,7 +14,6 @@ import plotly as plo
 import plotly.plotly as py
 import plotly.graph_objs as go
 import scipy.integrate as integrate
-from readDSMC.py import dsmcQuant
 
 # =============================================================================
 # Constant Initialization
@@ -74,7 +73,7 @@ def set_derived_PDFs():
     class coll_vel_pdf(st.rv_continuous):
         def _pdf(self,x):
             # x is ambient gas molecule velocity
-            v_s = (vx**2+vy**2+vz**2)**0.5
+            v_s = ((vx-xFlow)**2 + (vy-yFlow)**2 + (vz-zFlow)**2)**0.5
             norm = integrate.quad(lambda x: (x**2 + v_s**2)**0.5 * (m/(2*np.pi*kb*T))**1.5 * \
                                   4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T)), 0, 8*vMean)[0]
             return ((x**2 + v_s**2)**0.5 / norm) * (m/(2*np.pi*kb*T))**1.5 * (\
