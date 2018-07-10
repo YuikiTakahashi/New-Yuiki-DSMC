@@ -40,9 +40,9 @@ def set_derived_quants():
     vMeanM = 2 * (2 * kb * T_s / (M * np.pi))**0.5
 
     # Calculate average relative velocity given current species vx,vy,vz
-    vRel = integrate.tplquad(lambda p,t,v: np.sqrt((vx-v*np.sin(t)*np.cos(p))**2\
-                                                   + (vy-v*np.sin(t)*np.sin(p))**2\
-                                                   + (vz-v*np.cos(t))**2) * \
+    vRel = integrate.tplquad(lambda p,t,v: np.sqrt((vx-xFlow-v*np.sin(t)*np.cos(p))**2\
+                                                   + (vy-yFlow-v*np.sin(t)*np.sin(p))**2\
+                                                   + (vz-zFlow-v*np.cos(t))**2) * \
     (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * v**2 * np.exp(-m*v**2/(2*kb*T)) * np.sin(t)/(4*np.pi),\
     0, 1e3, lambda v: 0, lambda v: np.pi, lambda x,y: 0, lambda x,y: 2*np.pi)[0]
 
