@@ -31,12 +31,22 @@ cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
 cross *= 4 # Rough estimate of He-YbOH cross sectional area
 
 def set_derived_quants():
+    '''
+    This function must be run whenever n, T, T_s, vx, vy, or vz are changed.
+    '''
     global U, vMean, vMeanM, coll_freq, dt
-    U = 1.5 * kb * T
+#    U = 1.5 * kb * T
     vMean = 2 * (2 * kb * T / (m * np.pi))**0.5
     vMeanM = 2 * (2 * kb * T_s / (M * np.pi))**0.5
 
-    coll_freq = n * cross * vMeanM * (1 + M/m)**0.5 # Approximately n*cross*vMean
+    # Calculate average relative velocity given current species vx,vy,vz
+    vRel = integrate.tplquad(lambda p,t,v: np.sqrt((vx-v*np.sin(t)*np.cos(p))**2\
+                                                   + (vy-v*np.sin(t)*np.sin(p))**2\
+                                                   + (vz-v*np.cos(t))**2) * \
+    (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * v**2 * np.exp(-m*v**2/(2*kb*T)) * np.sin(t)/(4*np.pi),\
+    0, 1e3, lambda v: 0, lambda v: np.pi, lambda x,y: 0, lambda x,y: 2*np.pi)[0]
+
+    coll_freq = n * cross * vRel
     dt = 0.01 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
 
 set_derived_quants()
@@ -47,6 +57,59 @@ set_derived_quants()
 # =============================================================================
 # Probability Distribution Functions
 # =============================================================================
+
+def set_derived_PDFs():
+    '''
+    These PDF's need to be updated whenever T, T_s, vx, vy, or vz are changed.
+    '''
+    global vel_cv, coll_vel_cv, species_vel_cv
+
+    # Maxwell-Boltzmann Velocity Distribution for species molecules
+    # Used exclusively for setting initial velocities at a specified T_s
+    class species_vel_pdf(st.rv_continuous):
+        def _pdf(self,x):
+            return (M/(2*np.pi*kb*T_s))**1.5 * 4*np.pi * x**2 * np.exp(-M*x**2/(2*kb*T_s))
+    species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
+
+    def coll_vel_pdf(x, y, z):
+        '''
+        For a given vector of *velocity* <x, y, z>, return the probability density of
+        an ambient molecule having that velocity given it was involved in a collision.
+        '''
+        sqspeed = x**2 + y**2 + z**2
+        rel = ((x-(vx-xFlow))**2 + (y-(vy-yFlow))**2 + (z-(vz-zFlow))**2)**0.5
+        vel = (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * np.exp(-m*sqspeed/(2*kb*T))
+        return rel * vel
+
+set_derived_PDFs()
+
+# Use marginal distributions of coll_vel_pdf(x, y, z) to randomly determine x, y, z.
+class vel_x_pdf(st.rv_continuous):
+    def _pdf(self,x):
+        global vel_x_norm
+        if vel_x_norm == 0:
+            vel_x_norm = integrate.tplquad(lambda z, y, x: coll_vel_pdf(x, y, z), -1e3, 1e3, \
+                                 lambda y: -1e3, lambda y: 1e3, lambda x,y:-1e3, lambda x,y:1e3)[0]
+        return integrate.dblquad(lambda z, y: coll_vel_pdf(x, y, z), -1e3, 1e3, lambda y: -1e3, \
+                                 lambda y: 1e3)[0]/vel_x_norm
+vel_x_cv = vel_x_pdf(a=-1e3, b=1e3, name='vel_x_pdf') # vel_x_cv.rvs() for value
+
+class vel_y_pdf(st.rv_continuous):
+    def _pdf(self,y):
+        global vel_y_norm
+        if vel_y_norm == 0:
+            vel_y_norm = integrate.dblquad(lambda z, y: coll_vel_pdf(vel_x, y, z), -1e3, 1e3, \
+                                 lambda y: -1e3, lambda y: 1e3)[0]
+        return integrate.quad(lambda z: coll_vel_pdf(vel_x, y, z), -1e3, 1e3)[0] / vel_y_norm
+vel_y_cv = vel_y_pdf(a=0, b=1e3, name='vel_y_pdf') # vel_y_cv.rvs() for value
+
+class vel_z_pdf(st.rv_continuous):
+    def _pdf(self,z):
+        global vel_z_norm
+        if vel_z_norm == 0:
+            vel_z_norm = integrate.quad(lambda z: coll_vel_pdf(vel_x, vel_y, z), -1e3, 1e3)[0]
+        return coll_vel_pdf(vel_x, vel_y, z) / vel_z_norm
+vel_z_cv = vel_z_pdf(a=0, b=1e3, name='vel_z_pdf') # vel_z_cv.rvs() for value
 
 # Define a PDF ~ sin(x) to be used for random determination of azimuthal velocity angle
 class theta_pdf(st.rv_continuous):
@@ -59,36 +122,6 @@ class Theta_pdf(st.rv_continuous):
     def _pdf(self,x):
         return -np.cos(x)  # Normalized over its range [pi/2, pi]
 Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
-
-def set_derived_PDFs():
-    global vel_cv, coll_vel_cv, species_vel_cv
-
-    # Maxwell-Boltzmann Velocity Distribution for ambient molecules
-    class vel_pdf(st.rv_continuous):
-        def _pdf(self,x):
-            return (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T))  # x is velocity
-    vel_cv = vel_pdf(a=0, b=5*vMean, name='vel_pdf') # vel_cv.rvs() for value
-
-    # Maxwell-Boltzmann Velocity Distribution weighted by Bayesian influence to get P(v|collision)
-    class coll_vel_pdf(st.rv_continuous):
-        def _pdf(self,x):
-            # x is ambient gas molecule velocity
-            v_s = ((vx-xFlow)**2 + (vy-yFlow)**2 + (vz-zFlow)**2)**0.5
-            norm = integrate.quad(lambda x: (x**2 + v_s**2)**0.5 * (m/(2*np.pi*kb*T))**1.5 * \
-                                  4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T)), 0, 8*vMean)[0]
-            return ((x**2 + v_s**2)**0.5 / norm) * (m/(2*np.pi*kb*T))**1.5 * (\
-                   4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T)))
-    coll_vel_cv = coll_vel_pdf(a=0, b=8*vMean, name='coll_vel_pdf') # coll_vel_cv.rvs() for value
-
-    # Maxwell-Boltzmann Velocity Distribution for species molecules
-    # Used exclusively for setting initial velocities at a specified T_s
-    class species_vel_pdf(st.rv_continuous):
-        def _pdf(self,x):
-            return (M/(2*np.pi*kb*T_s))**1.5 * 4*np.pi * x**2 * np.exp(-M*x**2/(2*kb*T_s))
-    species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
-
-set_derived_PDFs()
-
 
 # =============================================================================
 # Form-dependent parameter setup
@@ -194,6 +227,16 @@ def updateParams(x, y, z, form='box'):
 # Helper Functions
 # =============================================================================
 
+def getAmbientVelocity():
+    global vel_x, vel_y, vel_z # Allows vel_y_cv, vel_z_cv to know vel_x, vel_y
+    global vel_x_norm, vel_y_norm, vel_z_norm
+    vel_x_norm, vel_y_norm, vel_z_norm = 0, 0, 0
+    # Get thermal velocity components
+    vel_x = vel_x_cv.rvs()
+    vel_y = vel_y_cv.rvs()
+    vel_z = vel_z_cv.rvs()
+    return vel_x + xFlow - vx, vel_y + yFlow - vy, vel_z + zFlow - vz
+
 def initial_species_velocity(T_s0):
     '''
     Given species temperature, return randomized (Boltzmann) speed in a
@@ -239,15 +282,10 @@ def collide():
     For current values of position (giving ambient flow rate) and velocity,
     increment vx, vy, vz according to collision physics.
     '''
-    global vx, vy, vz
-    v = coll_vel_cv.rvs() # Modified Maxwell Distribution for ambient molecule
+    global vx, vy, vz, dt
     Theta = Theta_cv.rvs()
     Phi = np.random.uniform(0, 2*np.pi)
-    theta = theta_cv.rvs()
-    phi = np.random.uniform(0, 2*np.pi)
-    vx_amb = v * np.sin(theta) * np.cos(phi) + xFlow - vx
-    vy_amb = v * np.sin(theta) * np.sin(phi) + yFlow - vy
-    vz_amb = v * np.cos(theta) + zFlow - vz
+    vx_amb, vy_amb, vz_amb = getAmbientVelocity()
     v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
     B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
 
