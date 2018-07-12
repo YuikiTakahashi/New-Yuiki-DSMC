@@ -78,35 +78,6 @@ def coll_vel_pdf(x, y, z):
     vel = (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * np.exp(-m*sqspeed/(2*kb*T))
     return rel * vel
 
-# Use marginal distributions of coll_vel_pdf(x, y, z) to randomly determine x, y, z.
-class vel_x_pdf(st.rv_continuous):
-    def _pdf(self,x):
-        global vel_x_norm
-        if vel_x_norm == 0:
-            vel_x_norm = integrate.tplquad(lambda z, y, x: coll_vel_pdf(x, y, z), -vMean*4, vMean*4, \
-                    lambda y: -vMean*4, lambda y: vMean*4, lambda x,y:-vMean*4, lambda x,y:vMean*4)[0]
-        return integrate.dblquad(lambda z, y: coll_vel_pdf(x, y, z), \
-                                 -vMean*4, vMean*4, lambda y: -vMean*4, \
-                                 lambda y: vMean*4)[0]/vel_x_norm
-vel_x_cv = vel_x_pdf(a=-vMean*4, b=vMean*4, name='vel_x_pdf') # vel_x_cv.rvs() for value
-
-class vel_y_pdf(st.rv_continuous):
-    def _pdf(self,y):
-        global vel_y_norm
-        if vel_y_norm == 0:
-            vel_y_norm = integrate.dblquad(lambda z, y: coll_vel_pdf(vel_x, y, z), -vMean*4, vMean*4, \
-                                 lambda y: -vMean*4, lambda y: vMean*4)[0]
-        return integrate.quad(lambda z: coll_vel_pdf(vel_x, y, z), -vMean*4, vMean*4)[0] / vel_y_norm
-vel_y_cv = vel_y_pdf(a=-vMean*4, b=vMean*4, name='vel_y_pdf') # vel_y_cv.rvs() for value
-
-class vel_z_pdf(st.rv_continuous):
-    def _pdf(self,z):
-        global vel_z_norm
-        if vel_z_norm == 0:
-            vel_z_norm = integrate.quad(lambda z: coll_vel_pdf(vel_x, vel_y, z), -vMean*4, vMean*4)[0]
-        return coll_vel_pdf(vel_x, vel_y, z) / vel_z_norm
-vel_z_cv = vel_z_pdf(a=-vMean*4, b=vMean*4, name='vel_z_pdf') # vel_z_cv.rvs() for value
-
 # Define a PDF ~ sin(x) to be used for random determination of azimuthal velocity angle
 class theta_pdf(st.rv_continuous):
     def _pdf(self,x):
@@ -222,15 +193,29 @@ def updateParams(x, y, z, form='box'):
 # Helper Functions
 # =============================================================================
 
-def getAmbientVelocity():
-    global vel_x, vel_y, vel_z # Allows vel_y_cv, vel_z_cv to know vel_x, vel_y
-    global vel_x_norm, vel_y_norm, vel_z_norm
-    vel_x_norm, vel_y_norm, vel_z_norm = 0, 0, 0
-    # Get thermal velocity components
-    vel_x = vel_x_cv.rvs()
-    vel_y = vel_y_cv.rvs()
-    vel_z = vel_z_cv.rvs()
-    return vel_x + xFlow - vx, vel_y + yFlow - vy, vel_z + zFlow - vz
+def coll_vel_index_pdf(x, y, z, p, w):
+    '''
+    Here, indices x, y, z are linearly converted to velocities using a
+    scale factor "precision" and offset "width/2" and passed into coll_vel_pdf.
+    Returns probability density at the velocity corresponding to these indices.
+    '''
+    return coll_vel_pdf(p*(x-w/2), p*(y-w/2), p*(z-w/2))
+
+def getAmbientVelocity(precision=4, width=700):
+    '''
+    Returns the total ambient particle velocity from species rest frame.
+    Each thermal velocity component can range from -width/2 to width/2 (m/s).
+    Allowed thermal velocity components are spaced by "precision" (m/s).
+    '''
+    width = int(width/precision) # scale for mesh
+    probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
+                            p=precision, w=width).flatten()
+    inds = np.linspace(0, len(probs)-1, len(probs))
+    choice = np.random.choice(inds, p=probs/np.sum(probs))
+    ind3D = np.where(np.reshape(inds, (width, width, width)) == choice)
+    z_ind, y_ind, x_ind = int(ind3D[0]), int(ind3D[1]), int(ind3D[2])
+    z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
+    return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
 
 def initial_species_velocity(T_s0):
     '''
