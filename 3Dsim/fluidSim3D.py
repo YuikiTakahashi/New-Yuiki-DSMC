@@ -138,7 +138,7 @@ def dsmcQuant(x0, y0, z0, col):
     ind3 = np.argmin(dists)
     z3, r3, quant3 = zs[ind3], rs[ind3], quants[ind3]
 
-    print(z1, r1, quant1, z2, r2, quant2, z3, r3, quant3)
+#    print(z1, r1, quant1, z2, r2, quant2, z3, r3, quant3)
     '''
     # Solve quant_i = A * z_i + B * r_i + C for A, B, C using 3 nearest (r_i, z_i).
     # The third-nearest point is now varied until the three points surround (r0, z0)
@@ -176,7 +176,6 @@ def dsmcQuant(x0, y0, z0, col):
 
     if col in [2, 7]:
         return np.exp(quant0)
-
     return quant0
 
 def inBounds(x, y, z, form='box'):
@@ -200,7 +199,9 @@ def setAmbientFlow(x, y, z, form='box'):
     (DSMC-generated) local values.
     '''
     global xFlow, yFlow, zFlow
-    if form in ['box', 'open']:
+    if form == 'currentCell':
+        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, 4)
+    elif form in ['box', 'open']:
         xFlow, yFlow, zFlow = 0, 0, 0
     elif form == 'curvedFlowBox':
         r = (x**2+y**2)**0.5
@@ -208,10 +209,9 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-    elif form == 'currentCell':
-        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, 4)
-        if abs(xFlow) > 500:
-            print(x, y, z, xFlow, "m/s")
+
+    if abs(xFlow) > 500:
+        print(x, y, z, xFlow, "m/s")
 
 def setAmbientDensity(x, y, z, form='box'):
     '''
@@ -336,7 +336,7 @@ def collide():
     global vx, vy, vz, dt
     Theta = Theta_cv.rvs()
     Phi = np.random.uniform(0, 2*np.pi)
-    vx_amb, vy_amb, vz_amb = getAmbientVelocity(simple=False)
+    vx_amb, vy_amb, vz_amb = getAmbientVelocity(simple=True)
     v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
     B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
 
@@ -615,10 +615,89 @@ def pointEmitter(filename="ConstantFlowEmitter.dat", x0=0, y0=0, z0=0, T_s0=4, f
             f.write(str(xs[i])+' '+str(ys[i])+' '+str(zs[i])+'\n')
     f.close()
 
-flowField = np.loadtxt('flows/DS2FF017.DAT', skiprows=1) # Assumes only first row isn't data.
+# =============================================================================
+# Data file analysis
+# =============================================================================
+
+def analyzeWallData(file_ext, pos):
+    '''
+    Running a Parallel fluid sim script produces a file with ten columns;
+    five for positions and velocities at the aperture, and
+    five for positions and velocities at a z-value ("pos") beyond the aperture.
+    This function produces a graph of the end positions on the walls and
+    prints the number of molecules making it to the aperture and to "pos".
+    It then plots position/velocity distributions at aperture and "pos".
+    '''
+    f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/finalPositions%s.dat'%file_ext)
+
+    xs = np.array(f[:, 5])
+    ys = f[:, 6]
+    zs = f[:, 7]
+    colour = plt.cm.Greens(100) # color = y coord
+    plt.plot(zs, np.sqrt(xs**2+ys**2), '+', c=colour, ms=13)
+    plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
+    plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
+    plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
+    plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
+    plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
+    plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
+    plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
+    plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+    plt.xlim(0, 0.1)
+    plt.ylim(0, 0.01)
+    plt.show()
+
+    unique, counts = np.unique(f[:, 2], return_counts=True)
+    numAp = counts[unique.tolist().index(0.064)]
+    unique, counts = np.unique(f[:, 7], return_counts=True)
+    numPost = counts[unique.tolist().index(pos)]
+    print('%d/10,000 (%.1f%%) made it to the aperture.'%(numAp, numAp/100.))
+    print('%d/10,000 (%.1f%%) made it to z = %.3f m.'%(numPost, numPost/100., pos))
+
+    fAp = f[f[:, 2]==0.064]
+    xs, ys = fAp[:, 0], fAp[:, 1]
+    plt.plot(xs, ys, '.')
+    plt.xlabel('x, meters')
+    plt.ylabel('y, meters')
+    plt.title("Radial Positions at the Aperture")
+    plt.savefig('images/'+file_ext+'PosAp.png')
+    plt.clf()
+
+    vrs, vzs = fAp[:, 3], fAp[:, 4]
+    plt.plot(vrs, vzs, '.')
+    plt.title("Velocity Distribution at the Aperture")
+    plt.ylabel('Axial velocity, m/s')
+    plt.xlabel('Radial velocity, m/s')
+    plt.savefig('images/'+file_ext+'VelAp.png')
+
+    plt.clf()
+    fPost = f[f[:, 7]==pos]
+    xs, ys = fPost[:, 5], fPost[:, 6]
+    plt.plot(xs, ys, '.')
+    plt.xlabel('x, meters')
+    plt.ylabel('y, meters')
+    plt.title("Radial Positions past the Aperture (z=%.3f)"%pos)
+    plt.savefig('images/'+file_ext+'PosPost.png')
+
+    plt.clf()
+    vrs, vzs = fPost[:, 8], fPost[:, 9]
+    plt.plot(vrs, vzs, '.')
+    plt.title("Velocity Distribution past the Aperture (z=%.3f)"%pos)
+    plt.ylabel('Axial velocity, m/s')
+    plt.xlabel('Radial velocity, m/s')
+    plt.savefig('images/'+file_ext+'VelPost.png')
+
+
+#flowField = np.loadtxt('flows/DS2FF017d.DAT', skiprows=1) # Assumes only first row isn't data.
+
+#import cProfile
+#cProfile.run("endPosition(form='currentCell')")
+
+# faster code?
+# other dsmc programs?
 
 # Parameters to vary:
-#       Initial position & velocity of species
-#       Cross-sectional area to match experimental results
 #       DSMC inputs (geometry & flow density ratio)
-#       Ambient velocity accuracy/precision
+#       Initial position & velocity of species (e.g. ablating - later)
+#       Cross-sectional area to match experimental results (later)
+#       Ambient velocity accuracy/precision (later)
