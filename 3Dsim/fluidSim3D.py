@@ -660,6 +660,7 @@ def analyzeWallData(file_ext, pos):
     plt.xlabel('x, meters')
     plt.ylabel('y, meters')
     plt.title("Radial Positions at the Aperture")
+    plt.tight_layout()
     plt.savefig('images/'+file_ext+'PosAp.png')
     plt.clf()
 
@@ -668,7 +669,13 @@ def analyzeWallData(file_ext, pos):
     plt.title("Velocity Distribution at the Aperture")
     plt.ylabel('Axial velocity, m/s')
     plt.xlabel('Radial velocity, m/s')
+    plt.tight_layout()
     plt.savefig('images/'+file_ext+'VelAp.png')
+
+    print('Radial velocity at aperture: %.1f +- %.1f m/s'\
+          %(np.mean(vrs), np.std(vrs)))
+    print('Axial velocity at aperture: %.1f +- %.1f m/s'\
+          %(np.mean(vzs), np.std(vzs)))
 
     plt.clf()
     fPost = f[f[:, 7]==pos]
@@ -676,16 +683,23 @@ def analyzeWallData(file_ext, pos):
     plt.plot(xs, ys, '.')
     plt.xlabel('x, meters')
     plt.ylabel('y, meters')
-    plt.title("Radial Positions past the Aperture (z=%.3f)"%pos)
+    plt.title("Radial Positions %.1f cm past the Aperture"%((pos-0.064)*100))
+    plt.tight_layout()
     plt.savefig('images/'+file_ext+'PosPost.png')
 
     plt.clf()
     vrs, vzs = fPost[:, 8], fPost[:, 9]
     plt.plot(vrs, vzs, '.')
-    plt.title("Velocity Distribution past the Aperture (z=%.3f)"%pos)
+    plt.title("Velocity Distribution %.1f cm past the Aperture"%((pos-0.064)*100))
     plt.ylabel('Axial velocity, m/s')
     plt.xlabel('Radial velocity, m/s')
+    plt.tight_layout()
     plt.savefig('images/'+file_ext+'VelPost.png')
+
+    print('Radial velocity %.1f cm past the Aperture: %.1f +- %.1f m/s'\
+          %((pos-0.064)*100, np.mean(vrs), np.std(vrs)))
+    print('Axial velocity %.1f cm past the Aperture: %.1f +- %.1f m/s'\
+          %((pos-0.064)*100, np.mean(vzs), np.std(vzs)))
 
 
 #flowField = np.loadtxt('flows/DS2FF017d.DAT', skiprows=1) # Assumes only first row isn't data.
