@@ -307,13 +307,12 @@ def endPosition(extPos):
     Return the final position of a particle somewhere in the cell or else
     past the aperture within a distance extPos.
     '''
-    global vx, vy, vz, ts
+    global vx, vy, vz
     np.random.seed()
     x, y, z = initial_species_position(.01, 'currentCell')
     vx, vy, vz = initial_species_velocity(T_s0=4)
     inCell = True
     xAp, yAp, zAp, vzAp, vrAp = 0, 0, 0, 0, 0
-    t = 0
 
     while inBounds(x, y, z, 'currentCell'):
         # Typically takes few ms to leave box
@@ -323,7 +322,6 @@ def endPosition(extPos):
         x += vx * dt
         y += vy * dt
         z += vz * dt
-        t += dt
         if z > 0.064 and inCell == True:
             # Record properties at aperture
             zAp = 0.064
@@ -337,7 +335,6 @@ def endPosition(extPos):
         z = extPos
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
-    ts.append(t)
     return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
 
 
@@ -357,15 +354,5 @@ def showWalls():
     f.write('\n'.join(map(str, result)).replace(")", "").replace(",", "").replace("(", ""))
     f.close()
 
-#showWalls()
-
-base_cross = cross
-for mult in [1, 1.5, 2, 2.5, 3]:
-    cross = base_cross * mult
-    set_derived_quants()
-    ts = []
-    for i in range(50):
-        print(i)
-        endPosition(.094)
-    print(mult, np.mean(ts), np.std(ts))
-
+#import cProfile
+#cProfile.run("endPosition(0.094)")
