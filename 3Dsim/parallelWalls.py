@@ -4,13 +4,18 @@
 Created on Wed Jun 20 15:43:30 2018
 
 @author: Dave
+
+This is an auxiliary file containing only a specific set of parameters and
+functionalities desired for processing on the HPC cluster.
 """
 
 import numpy as np
 import scipy.stats as st
-from multiprocessing import Pool
+import scipy.interpolate as si
+from joblib import Parallel, delayed
 
-FF = 'flows/DS2FF018nowalls.DAT' # Set DS2FF file or leave blank if n/a
+
+FF = 'flows/DS2FF018.DAT' # Set DS2FF file or leave blank if n/a
 outfile = 'finalPositions018.dat' # Set output file name for showWalls
 
 # =============================================================================
@@ -27,6 +32,7 @@ massParam = 2 * m / (m + M)
 n = 10**21 # m^-3
 cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
 cross *= 4 # Rough estimate of He-YbOH cross sectional area
+#cross *= 5
 
 # Global variable initialization: these values are irrelevant
 vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
@@ -39,7 +45,7 @@ def set_derived_quants():
     vMean = 2 * (2 * kb * T / (m * np.pi))**0.5
     vMeanM = 2 * (2 * kb * T_s / (M * np.pi))**0.5
     coll_freq = n * cross * (vMean + np.sqrt((vx-xFlow)**2 + (vy-yFlow)**2 + (vz-zFlow)**2)/3) # vRel
-    if 0.1 / coll_freq < 1e-5:
+    if 0.1 / coll_freq < 1e-4:
         dt = 0.1 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
         no_collide = False
     else: # Density is so low that collision frequency is near 0
@@ -59,7 +65,7 @@ set_derived_quants()
 class vel_pdf(st.rv_continuous):
     def _pdf(self,x):
         return (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T))
-vel_cv = vel_pdf(a=0, b=5*vMean, name='vel_pdf') # vel_cv.rvs()
+vel_cv = vel_pdf(a=0, b=4*vMean, name='vel_pdf') # vel_cv.rvs()
 
 # Maxwell-Boltzmann Velocity Distribution for species molecules
 # Used exclusively for setting initial velocities at a specified T_s
@@ -94,45 +100,35 @@ Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for 
 # Form-dependent parameter setup
 # =============================================================================
 
+# =============================================================================
+# Must have axis-of-symmetry "wall" data in FF for this to work !!!
+# =============================================================================
 try:
     flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
     zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
     vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
     quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
+    grid_x, grid_y = np.mgrid[0.022:0.1:400j, 0:0.0064:100j]
+    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y))
+    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y))
+    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y))
+    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y))
+    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y))
+    # These are interpolation functions:
+    f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
+    f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
+    f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
+    f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
+    f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
 except:
     print("Note: No Flow Field DSMC data.")
 
-def dsmcQuant(x0, y0, z0, col):
-    '''
-    Interpolate quantities from an axially symmetric DSMC FF file.
-    Col parameter: 2 = number density, 3 = temperature, 4 = velocities
-    '''
-    r0 = (x0**2 + y0**2)**0.5
-    quants = quantHolder[col]
-    dists = (zs-z0)**2 + (rs-r0)**2
-
-    # Find 3 nearest (r, z) points to (r0, z0).
-    ind1 = np.argmin(dists)
-    quant1 = quants[ind1]
-
-    dists[ind1] = 99 # Something big
-    ind2 = np.argmin(dists)
-    quant2 = quants[ind2]
-
-    dists[ind2] = 99 # Something big
-    ind3 = np.argmin(dists)
-    quant3 = quants[ind3]
-
-    if col == 2:
-        # Take geometric mean for densities; make sure all nonzero in DS2FF.
-        quant0 = st.gmean([quant1, quant2, quant3])
-    else:
-        quant0 = np.mean([quant1, quant2, quant3])
-
-    if col == 4:
+def dsmcQuant(x0, y0, z0, func):
+    quant0 = func(z0, (x0**2 + y0**2)**0.5)[0][0]
+    if func == f3:
         Vz = quant0
-        vr = dsmcQuant(x0, y0, z0, 5)
-        vPerpCw = dsmcQuant(x0, y0, z0, 6)
+        vr = dsmcQuant(x0, y0, z0, f4)
+        vPerpCw = dsmcQuant(x0, y0, z0, f5)
 
         theta = np.arctan2(y0, x0)
         rot = np.pi/2 - theta
@@ -140,7 +136,8 @@ def dsmcQuant(x0, y0, z0, col):
         Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
 
         return Vx, Vy, Vz
-
+    if func == f1:
+        return np.exp(quant0)
     return quant0
 
 def inBounds(x, y, z, form='box'):
@@ -149,7 +146,7 @@ def inBounds(x, y, z, form='box'):
     the boundary of "form".
     '''
     if form in ['box', 'curvedFlowBox']:
-        inside = abs(x) <= 0.05 and abs(y) <= 0.05 and abs(z) <= 0.05
+        inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
     elif form == 'currentCell':
         r = np.sqrt(x**2+y**2)
         #in1 = r < 0.0015875 and z > 0.001 and z < 0.015
@@ -173,7 +170,7 @@ def setAmbientFlow(x, y, z, form='box'):
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
     elif form == 'currentCell':
-        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, 4)
+        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
         if abs(xFlow) > 1000:
             print(x, y, z, xFlow, 'm/s')
 
@@ -186,8 +183,8 @@ def setAmbientDensity(x, y, z, form='box'):
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
     elif form == 'currentCell':
-        n = dsmcQuant(x, y, z, 2)
-        if abs(n) > 1e23:
+        n = dsmcQuant(x, y, z, f1)
+        if abs(n) > 1e26:
             print(x, y, z, n, 'm-3')
 
 def setAmbientTemp(x, y, z, form='box'):
@@ -199,7 +196,7 @@ def setAmbientTemp(x, y, z, form='box'):
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
     elif form == 'currentCell':
-        T = dsmcQuant(x, y, z, 3)
+        T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
             print(x, y, z, T, 'K')
 
@@ -284,7 +281,7 @@ def collide():
     For current values of position (giving ambient flow rate) and velocity,
     increment vx, vy, vz according to collision physics.
     '''
-    global vx, vy, vz, dt
+    global vx, vy, vz
     Theta = Theta_cv.rvs()
     Phi = np.random.uniform(0, 2*np.pi)
     vx_amb, vy_amb, vz_amb = getAmbientVelocity(precision=3, simple=True)
@@ -325,7 +322,7 @@ def endPosition(extPos):
     while inBounds(x, y, z, 'currentCell'):
         # Typically takes few ms to leave box
         updateParams(x, y, z, 'currentCell')
-        if np.random.uniform() < 0.1 and no_collide==False: # 1/100 chance of collision
+        if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
             collide()
         x += vx * dt
         y += vy * dt
@@ -343,7 +340,6 @@ def endPosition(extPos):
         z = extPos
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
-
     return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
 
 
@@ -357,10 +353,9 @@ def showWalls():
     the endPosition function parameters.
     '''
     f = open(outfile, "w")
-    inputs = np.ones(10000)*0.094
-    with Pool(processes=100) as pool:
-        result = pool.map(endPosition, inputs, 100)
-    f.write('\n'.join(map(str, result)).replace(")", "").replace(",", "").replace("(", ""))
+    inputs = np.ones(2)*0.094
+    results = Parallel(n_jobs=2)(delayed(endPosition)(i) for i in inputs)
+    f.write('\n'.join(map(str, results)).replace(")", "").replace(",", "").replace("(", ""))
     f.close()
 
 showWalls()
