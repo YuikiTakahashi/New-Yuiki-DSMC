@@ -8,14 +8,11 @@ Created on Wed Jun 20 15:43:30 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import scipy.stats as st
+import scipy.interpolate as si
 import plotly as plo
-import plotly.plotly as py
 import plotly.graph_objs as go
 import scipy.integrate as integrate
-from scipy import linalg as LA
-from multiprocessing import Pool
 
 # =============================================================================
 # Constant Initialization
@@ -107,74 +104,42 @@ Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for 
 # Form-dependent parameter setup
 # =============================================================================
 
+# =============================================================================
+# Must have axis-of-symmetry "wall" data in FF for this to work !!!
+# =============================================================================
 try:
-    flowField = np.loadtxt('flows/DS2FF.DAT', skiprows=1) # Assumes only first row isn't data.
+    flowField = np.loadtxt('flows/DS2FF018.DAT', skiprows=1) # Assumes only first row isn't data.
+    zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
+    vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
+    quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
+    grid_x, grid_y = np.mgrid[0.022:0.1:400j, 0:0.0064:100j]
+    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y))
+    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y))
+    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y))
+    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y))
+    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y))
+    # These are interpolation functions:
+    f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
+    f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
+    f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
+    f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
+    f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
 except:
     print("Note: No Flow Field DSMC data.")
 
-def dsmcQuant(x0, y0, z0, col):
-    '''
-    Interpolate quantities from an axially symmetric DSMC FF file.
-    Col parameter: 2 = number density, 7 = temperature, 4 = velocities
-    '''
-    r0 = (x0**2 + y0**2)**0.5
-    quants = flowField[:, col]
-    if col in [2, 7]:
-        np.place(quants, quants==0, 1) # To not have log(0)
-        quants = np.log(quants) # Interpolate densities/temps on a log scale
-    zs = flowField[:, 0] # DSMC calls these 'x' values
-    rs = flowField[:, 1] # DSMC calls these 'y' values
-    dists = (zs-z0)**2 + (rs-r0)**2
-
-    # Find 3 nearest (r, z) points to (r0, z0).
-    ind1 = np.argmin(dists)
-    z1, r1, quant1 = zs[ind1], rs[ind1], quants[ind1]
-
-    dists[ind1] = np.amax(dists)
-    ind2 = np.argmin(dists)
-    z2, r2, quant2 = zs[ind2], rs[ind2], quants[ind2]
-
-    dists[ind2] = np.amax(dists)
-    ind3 = np.argmin(dists)
-    z3, r3, quant3 = zs[ind3], rs[ind3], quants[ind3]
-
-#    print(z1, r1, quant1, z2, r2, quant2, z3, r3, quant3)
-    '''
-    # Solve quant_i = A * z_i + B * r_i + C for A, B, C using 3 nearest (r_i, z_i).
-    # The third-nearest point is now varied until the three points surround (r0, z0)
-    # and are not collinear.
-
-    while True:
-        if ((r1 == r2 and r2 == r3) or (z1 == z2 and z2 == z3) or \
-            z0 in [max([z0, z1, z2, z3]), min([z0, z1, z2, z3])] or \
-            r0 in [max([r0, r1, r2, r3]), min([r0, r1, r2, r3])]):
-            dists[ind3] = np.amax(dists)
-            ind3 = np.argmin(dists)
-            z3, r3, quant3 = zs[ind3], rs[ind3], quants[ind3]
-
-        else:
-            left = np.array([[z1, r1, 1], [z2, r2, 1], [z3, r3, 1]])
-            right = np.array([quant1, quant2, quant3])
-            a, b, c = LA.solve(left, right)
-            break
-
-    quant0 = a * z0 + b * r0 + c
-    '''
-    quant0 = np.mean([quant1, quant2, quant3])
-
-    if col == 4:
+def dsmcQuant(x0, y0, z0, func):
+    quant0 = func(z0, (x0**2 + y0**2)**0.5)[0][0]
+    if func == f3:
         Vz = quant0
-        vr = dsmcQuant(x0, y0, z0, 5)
-        vPerpCw = dsmcQuant(x0, y0, z0, 6)
+        vr = dsmcQuant(x0, y0, z0, f4)
+        vPerpCw = dsmcQuant(x0, y0, z0, f5)
 
         theta = np.arctan2(y0, x0)
         rot = np.pi/2 - theta
         Vx = np.cos(rot) * vPerpCw + np.sin(rot) * vr
         Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
-
         return Vx, Vy, Vz
-
-    if col in [2, 7]:
+    if func == f1:
         return np.exp(quant0)
     return quant0
 
@@ -333,7 +298,7 @@ def collide():
     For current values of position (giving ambient flow rate) and velocity,
     increment vx, vy, vz according to collision physics.
     '''
-    global vx, vy, vz, dt
+    global vx, vy, vz
     Theta = Theta_cv.rvs()
     Phi = np.random.uniform(0, 2*np.pi)
     vx_amb, vy_amb, vz_amb = getAmbientVelocity(simple=True)
@@ -409,6 +374,27 @@ def getDensityTrend(filename):
             f.write('%.1E'%n+' '+meanLen+' '+meanTime+' '+stdLen+' '+stdTime+'\n')
     f.close()
 
+def getCrossTrend():
+    global cross
+    for i in [1, 1.5, 2, 2.5, 3]:
+        cross = cross * i
+        set_derived_quants()
+        ts = []
+        for j in range(50):
+            x, y, z, t = 0, 0, 0, 0
+            vx, vy, vz = initial_species_velocity(T_s0=4)
+
+            while inBounds(x, y, z):
+                if np.random.uniform() < 0.1 and no_collide==False:
+                    collide()
+                x += vx * dt
+                y += vy * dt
+                z += vz * dt
+                t += dt
+            ts.append(t)
+
+        print(i, np.mean(ts), np.std(ts)/np.sqrt(50))
+
 def getData(t1=0.00005, t2=0.0015, step=0.00005, trials=400, x0=0, y0=0, z0=0, T_s0=4):
     '''
     For a range of total times, record expected values of final position,
@@ -462,11 +448,7 @@ def getData(t1=0.00005, t2=0.0015, step=0.00005, trials=400, x0=0, y0=0, z0=0, T
                               stdx,stdy,stdz,stdSq,stdSpeed])+'\n')
     f.close()
 
-vxs = []
-vys = []
-vzs = []
-dts = []
-def endPosition(T_s0=4, L0=0.01, form='curvedFlowBox'):
+def endPosition(T_s0=4, L0=0.01, form='currentCell'):
     '''
     Return the final position of a particle somewhere on the (10cm)^3 box.
     Initial position determined randomly in a cube around the origin.
@@ -477,10 +459,6 @@ def endPosition(T_s0=4, L0=0.01, form='curvedFlowBox'):
 
     while inBounds(x, y, z, form):
         # Typically takes few ms to leave box
-        vxs.append(vx)
-        vys.append(vy)
-        vzs.append(vz)
-        dts.append(dt)
         updateParams(x, y, z, form)
         if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
             collide()
@@ -628,7 +606,7 @@ def analyzeWallData(file_ext, pos):
     prints the number of molecules making it to the aperture and to "pos".
     It then plots position/velocity distributions at aperture and "pos".
     '''
-    f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/finalPositions%s.dat'%file_ext)
+    f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/%s.dat'%file_ext)
 
     xs = np.array(f[:, 5])
     ys = f[:, 6]
@@ -652,7 +630,7 @@ def analyzeWallData(file_ext, pos):
     unique, counts = np.unique(f[:, 7], return_counts=True)
     numPost = counts[unique.tolist().index(pos)]
     print('%d/10,000 (%.1f%%) made it to the aperture.'%(numAp, numAp/100.))
-    print('%d/10,000 (%.1f%%) made it to z = %.3f m.'%(numPost, numPost/100., pos))
+
 
     fAp = f[f[:, 2]==0.064]
     xs, ys = fAp[:, 0], fAp[:, 1]
@@ -676,7 +654,11 @@ def analyzeWallData(file_ext, pos):
           %(np.mean(vrs), np.std(vrs)))
     print('Axial velocity at aperture: %.1f +- %.1f m/s'\
           %(np.mean(vzs), np.std(vzs)))
+    print('Angular spread at aperture: %.1f deg \n'\
+          %(180/np.pi * 2 * np.arctan(np.mean(vrs)/2/np.mean(vzs))))
 
+
+    print('%d/10,000 (%.1f%%) made it to z = %.3f m.'%(numPost, numPost/100., pos))
     plt.clf()
     fPost = f[f[:, 7]==pos]
     xs, ys = fPost[:, 5], fPost[:, 6]
@@ -696,13 +678,14 @@ def analyzeWallData(file_ext, pos):
     plt.tight_layout()
     plt.savefig('images/'+file_ext+'VelPost.png')
 
-    print('Radial velocity %.1f cm past the Aperture: %.1f +- %.1f m/s'\
+    print('Radial velocity %.1f cm past the aperture: %.1f +- %.1f m/s'\
           %((pos-0.064)*100, np.mean(vrs), np.std(vrs)))
-    print('Axial velocity %.1f cm past the Aperture: %.1f +- %.1f m/s'\
+    print('Axial velocity %.1f cm past the aperture: %.1f +- %.1f m/s'\
           %((pos-0.064)*100, np.mean(vzs), np.std(vzs)))
+    print('Angular spread %.1f cm past the aperture: %.1f deg'\
+          %((pos-0.064)*100, \
+            180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
-
-#flowField = np.loadtxt('flows/DS2FF017d.DAT', skiprows=1) # Assumes only first row isn't data.
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
@@ -711,7 +694,8 @@ def analyzeWallData(file_ext, pos):
 # other dsmc programs?
 
 # Parameters to vary:
-#       DSMC inputs (geometry & flow density ratio)
+#       Cross-sectional area to match experimental results
+#       DSMC inputs (geometry & flow density)
 #       Initial position & velocity of species (e.g. ablating - later)
-#       Cross-sectional area to match experimental results (later)
 #       Ambient velocity accuracy/precision (later)
+
