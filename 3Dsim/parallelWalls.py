@@ -15,7 +15,7 @@ import scipy.interpolate as si
 from joblib import Parallel, delayed
 
 
-FF = 'flows/DS2FF018.DAT' # Set DS2FF file or leave blank if n/a
+FF = 'DS2FF018.DAT' # Set DS2FF file or leave blank if n/a
 outfile = 'finalPositions018.dat' # Set output file name for showWalls
 
 # =============================================================================
@@ -146,7 +146,7 @@ def inBounds(x, y, z, form='box'):
     the boundary of "form".
     '''
     if form in ['box', 'curvedFlowBox']:
-        inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
+        inside = abs(x) <= 0.05 and abs(y) <= 0.05 and abs(z) <= 0.05
     elif form == 'currentCell':
         r = np.sqrt(x**2+y**2)
         #in1 = r < 0.0015875 and z > 0.001 and z < 0.015
@@ -340,12 +340,14 @@ def endPosition(extPos):
         z = extPos
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
+
     return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
 
 
 # =============================================================================
 # Iterating endPosition
 # =============================================================================
+from multiprocessing import Pool
 
 def showWalls():
     '''
@@ -353,8 +355,10 @@ def showWalls():
     the endPosition function parameters.
     '''
     f = open(outfile, "w")
-    inputs = np.ones(2)*0.094
-    results = Parallel(n_jobs=2)(delayed(endPosition)(i) for i in inputs)
+    inputs = np.ones(10)*0.094
+#    results = Parallel(n_jobs=-1)(delayed(endPosition)(i) for i in inputs)
+    with Pool(processes=100) as pool:
+        results = pool.map(endPosition, inputs, 1)
     f.write('\n'.join(map(str, results)).replace(")", "").replace(",", "").replace("(", ""))
     f.close()
 
