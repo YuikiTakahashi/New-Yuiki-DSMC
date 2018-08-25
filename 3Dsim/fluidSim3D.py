@@ -149,7 +149,7 @@ def inBounds(x, y, z, form='box'):
     the boundary of "form".
     '''
     if form in ['box', 'curvedFlowBox']:
-        inside = abs(x) <= 0.05 and abs(y) <= 0.05 and abs(z) <= 0.05
+        inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
     elif form == 'currentCell':
         r = np.sqrt(x**2+y**2)
 #        in1 = r < 0.0015875 and z > -.015 and z < 0.015
@@ -376,7 +376,7 @@ def getDensityTrend(filename):
 
 def getCrossTrend():
     global cross
-    for i in [1, 1.5, 2, 2.5, 3]:
+    for i in [0.5, 1]:
         cross = cross * i
         set_derived_quants()
         ts = []
@@ -649,6 +649,11 @@ def analyzeWallData(file_ext, pos):
     plt.xlabel('Radial velocity, m/s')
     plt.tight_layout()
     plt.savefig('images/'+file_ext+'VelAp.png')
+    plt.clf()
+    plt.hist(vzs, bins=15)
+    plt.xlabel('Axial velocity, m/s')
+    plt.ylabel('Frequency')
+    plt.savefig('images/hist.png')
 
     print('Radial velocity at aperture: %.1f +- %.1f m/s'\
           %(np.mean(vrs), np.std(vrs)))
@@ -695,6 +700,7 @@ def analyzeWallData(file_ext, pos):
 
 # Parameters to vary:
 #       Cross-sectional area to match experimental results
+#           Find gammas at good cross, match fig 3 (patterson doyle)?
 #       DSMC inputs (geometry & flow density)
 #       Initial position & velocity of species (e.g. ablating - later)
 #       Ambient velocity accuracy/precision (later)
