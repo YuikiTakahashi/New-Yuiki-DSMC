@@ -48,7 +48,7 @@ def set_derived_quants():
 #    (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * v**2 * np.exp(-m*v**2/(2*kb*T)) * np.sin(t)/(4*np.pi),\
 #    0, vMean*4, lambda v: 0, lambda v: np.pi, lambda v,t: 0, lambda v,t: 2*np.pi)[0]
 
-    coll_freq = n * cross * (vMean + np.sqrt((vx-xFlow)**2 + (vy-yFlow)**2 + (vz-zFlow)**2)/3)# vRel
+    coll_freq = n * cross * vMean # vRel
     if 0.01 / coll_freq < 1e-5:
         dt = 0.01 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
         no_collide = False
@@ -105,19 +105,23 @@ Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for 
 # =============================================================================
 
 # =============================================================================
-# Must have axis-of-symmetry "wall" data in FF for this to work !!!
+# Must have axis-of-symmetry "wall" data in FF for this to work.
 # =============================================================================
 try:
-    flowField = np.loadtxt('flows/DS2FF018.DAT', skiprows=1) # Assumes only first row isn't data.
+    raise # Skip data loading when only want file analysis function
+    flowField = np.loadtxt('flows/DS2FF017d.DAT', skiprows=1) # Assumes only first row isn't data.
     zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
     vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
     quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
-    grid_x, grid_y = np.mgrid[0.022:0.1:400j, 0:0.0064:100j]
-    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y))
-    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y))
-    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y))
-    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y))
-    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y))
+    grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+    # The high grid density increases overhead time for running this initialization,
+    # but the time for running particle simulations is unaffected.
+    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
+    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
+    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
+    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
+    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
+    # The 'nearest' gridding has not been thoroughly tested for edge-case accuracy.
     # These are interpolation functions:
     f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
     f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
@@ -143,7 +147,7 @@ def dsmcQuant(x0, y0, z0, func):
         return np.exp(quant0)
     return quant0
 
-def inBounds(x, y, z, form='box'):
+def inBounds(x, y, z, form='box', endPos=0.12):
     '''
     Return Boolean value for whether or not a position is within
     the boundary of "form".
@@ -152,10 +156,10 @@ def inBounds(x, y, z, form='box'):
         inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
     elif form == 'currentCell':
         r = np.sqrt(x**2+y**2)
-#        in1 = r < 0.0015875 and z > -.015 and z < 0.015
-        in2 = r < 0.00635 and z > 0.015 and z < 0.0635
-        in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
-        inside = in2 + in3 # + in1
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in3 = r < 0.030 and z >= 0.0640 and z < endPos
+        inside = in1 + in2 + in3
     return inside
 
 def setAmbientFlow(x, y, z, form='box'):
@@ -164,9 +168,7 @@ def setAmbientFlow(x, y, z, form='box'):
     (DSMC-generated) local values.
     '''
     global xFlow, yFlow, zFlow
-    if form == 'currentCell':
-        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, 4)
-    elif form in ['box', 'open']:
+    if form in ['box', 'open']:
         xFlow, yFlow, zFlow = 0, 0, 0
     elif form == 'curvedFlowBox':
         r = (x**2+y**2)**0.5
@@ -174,9 +176,10 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-
-    if abs(xFlow) > 500:
-        print(x, y, z, xFlow, "m/s")
+    elif form == 'currentCell':
+        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
+        if abs(xFlow) > 1000:
+            print(x, y, z, xFlow, 'm/s')
 
 def setAmbientDensity(x, y, z, form='box'):
     '''
@@ -187,9 +190,9 @@ def setAmbientDensity(x, y, z, form='box'):
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
     elif form == 'currentCell':
-        n = dsmcQuant(x, y, z, 2)
-        if abs(n) > 1e24:
-            print(x, y, z, n, "m-3")
+        n = dsmcQuant(x, y, z, f1)
+        if abs(n) > 1e26:
+            print(x, y, z, n, 'm-3')
 
 def setAmbientTemp(x, y, z, form='box'):
     '''
@@ -200,13 +203,11 @@ def setAmbientTemp(x, y, z, form='box'):
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
     elif form == 'currentCell':
-        T = dsmcQuant(x, y, z, 7)
+        T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
-            print(x, y, z, T, "K")
+            print(x, y, z, T, 'K')
 
 def updateParams(x, y, z, form='box'):
-    if (vx**2+vy**2+vz**2)**0.5 * dt > 0.001:
-        print('too fast!')
     setAmbientFlow(x, y, z, form)
     setAmbientDensity(x, y, z, form)
     setAmbientTemp(x, y, z, form)
@@ -448,32 +449,44 @@ def getData(t1=0.00005, t2=0.0015, step=0.00005, trials=400, x0=0, y0=0, z0=0, T
                               stdx,stdy,stdz,stdSq,stdSpeed])+'\n')
     f.close()
 
-def endPosition(T_s0=4, L0=0.01, form='currentCell'):
+def endPosition(extPos=0.12):
     '''
-    Return the final position of a particle somewhere on the (10cm)^3 box.
-    Initial position determined randomly in a cube around the origin.
+    Return the final position of a particle somewhere in the cell or else
+    past the aperture within a distance extPos.
     '''
     global vx, vy, vz
-    x, y, z = initial_species_position(L0, form)
-    vx, vy, vz = initial_species_velocity(T_s0)
-
-    while inBounds(x, y, z, form):
+    trajectory = open('trajectory.dat', 'w')
+    np.random.seed()
+    x, y, z = initial_species_position(.01, 'currentCell')
+    vx, vy, vz = initial_species_velocity(T_s0=4)
+    inCell = True
+    xAp, yAp, zAp, vzAp, vrAp = 0, 0, 0, 0, 0
+    trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
+                                        round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
+    while inBounds(x, y, z, 'currentCell', extPos):
         # Typically takes few ms to leave box
-        updateParams(x, y, z, form)
-        if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
+        updateParams(x, y, z, 'currentCell')
+        if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
             collide()
+            trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
+                                        round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
         x += vx * dt
         y += vy * dt
         z += vz * dt
+        if z > 0.064 and inCell == True:
+            # Record properties at aperture
+            zAp = 0.064
+            xAp = x - (z-0.064)/(vz * dt) * (vx * dt)
+            yAp = y - (z-0.064)/(vz * dt) * (vy * dt)
+            vzAp, vrAp = vz, np.sqrt(vx**2+vy**2)
+            inCell = False
 
-    if z > 0.064:
-        # Linearly backtrack to aperture
-        z = 0.064
-        x -= (z-0.064)/(vz * dt) * (vx * dt)
-        y -= (z-0.064)/(vz * dt) * (vy * dt)
-
-    return x, y, z
-
+    if z > extPos:
+        # Linearly backtrack to boundary
+        z = extPos
+        x -= (z-extPos)/(vz * dt) * (vx * dt)
+        y -= (z-extPos)/(vz * dt) * (vy * dt)
+    return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
 
 # =============================================================================
 # Image-generating functions
@@ -691,6 +704,101 @@ def analyzeWallData(file_ext, pos):
           %((pos-0.064)*100, \
             180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
+def analyzeTrajData(file_ext, pos=0.064):
+    '''
+    Running a Parallel open trajectory script produces a file with six columns;
+    three each for positions and velocities.
+    This function produces a graph of the end positions on the walls and
+    prints the number of molecules making it to the z-value "pos".
+    It then plots position/velocity distributions at "pos".
+    The default value is set to the aperture position, 0.064 m.
+    '''
+    print('The aperture is at z = 0.064 m.')
+    print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos, pos-0.064))
+    f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+
+    dpos = pos
+    pos *= 1000 # trajectory file data is in mm
+    num = 0
+    for i in range(len(f)):
+        if not np.any(f[i]):
+            num += 1 # count number of particles simulated in file
+
+    finals = np.zeros((num, 6))
+    j = 0
+    for i in range(len(f)):
+        if (not np.any(f[i])) and f[i-1][2] != 120 and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
+            finals[j] = f[i-1]
+            j += 1
+    found = False
+    for i in range(len(f)):
+        if found == False and f[i][2] >= pos:
+            x, y, z, vx, vy, vz = f[i-1]
+            time = (pos-z)/vz
+            x += vx * time
+            y += vy * time
+            finals[j] = np.array([x, y, pos, vx, vy, vz])
+            j += 1
+            found = True
+        elif not np.any(f[i]):
+            found = False
+
+    xs = finals[:, 0] / 1000.
+    ys = finals[:, 1] / 1000.
+    zs = finals[:, 2] / 1000.
+    colour = plt.cm.Greens(100)
+    plt.plot(zs, np.sqrt(xs**2+ys**2), '+', c=colour, ms=13)
+    plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
+    plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
+    plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
+    plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
+    plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
+    plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
+    plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
+    plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+    plt.xlim(0, dpos+0.01)
+    plt.show()
+
+    unique, counts = np.unique(finals[:, 2], return_counts=True)
+    numArrived = counts[unique.tolist().index(pos)]
+    print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, dpos))
+
+
+    pdata = finals[finals[:, 2]==pos]
+    xs, ys, zs, vxs, vys, vzs = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
+                                pdata[:,3], pdata[:,4], pdata[:,5]
+#    rs = np.sqrt(xs**2 + ys**2)
+    vrs = np.sqrt(vxs**2 + vys**2)
+
+    plt.plot(xs, ys, '.')
+    plt.xlabel('x, meters')
+    plt.ylabel('y, meters')
+    plt.title("Radial Positions at z = %g m"%dpos)
+    plt.tight_layout()
+    plt.show()
+#    plt.savefig('images/'+file_ext+'Pos%g.png')%pos
+    plt.clf()
+
+    plt.plot(vrs, vzs, '.')
+    plt.title("Velocity Distribution at z = %g m"%dpos)
+    plt.ylabel('Axial velocity, m/s')
+    plt.xlabel('Radial velocity, m/s')
+    plt.tight_layout()
+    plt.show()
+#    plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
+    plt.clf()
+    plt.hist(vzs, bins=15)
+    plt.xlabel('Axial velocity, m/s')
+    plt.ylabel('Frequency')
+    plt.show()
+#    plt.savefig('images/hist.png')
+
+    print('Radial velocity at z = %g m: %.1f +- %.1f m/s'\
+          %(dpos, np.mean(vrs), np.std(vrs)))
+    print('Axial velocity at z = %g m: %.1f +- %.1f m/s'\
+          %(dpos, np.mean(vzs), np.std(vzs)))
+    print('Angular spread at z = %g m: %.1f deg \n'\
+          %(dpos, 180/np.pi * 2 * np.arctan(np.mean(vrs)/2/np.mean(vzs))))
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
