@@ -20,6 +20,7 @@ import scipy.integrate as integrate
 
 kb = 1.38 * 10**-23
 NA = 6.022 * 10**23
+sccmSI = 7.45E-07 * NA
 T = 4 # Ambient temperature (K)
 T_s = 4 # Species temperature (K) for initial velocity distributions
 m = 0.004 / NA # Ambient gas mass (kg)
@@ -28,6 +29,7 @@ massParam = 2 * m / (m + M)
 n = 10**21 # m^-3
 cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
 cross *= 4 # Rough estimate of He-YbOH cross sectional area
+cross *= 5 # Manual
 
 # Global variable initialization: these values are irrelevant
 vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
@@ -49,8 +51,8 @@ def set_derived_quants():
 #    0, vMean*4, lambda v: 0, lambda v: np.pi, lambda v,t: 0, lambda v,t: 2*np.pi)[0]
 
     coll_freq = n * cross * vMean # vRel
-    if 0.01 / coll_freq < 1e-5:
-        dt = 0.01 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
+    if 0.1 / coll_freq < 1e-5:
+        dt = 0.1 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
         no_collide = False
     else: # Density is so low that collision frequency is near 0
         no_collide = True # Just don't collide.
@@ -109,7 +111,7 @@ Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for 
 # =============================================================================
 try:
     raise # Skip data loading when only want file analysis function
-    flowField = np.loadtxt('flows/DS2FF017d.DAT', skiprows=1) # Assumes only first row isn't data.
+    flowField = np.loadtxt('flows/DS2FF019.DAT', skiprows=1) # Assumes only first row isn't data.
     zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
     vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
     quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
@@ -704,7 +706,7 @@ def analyzeWallData(file_ext, pos):
           %((pos-0.064)*100, \
             180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
-def analyzeTrajData(file_ext, pos=0.064):
+def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -716,8 +718,10 @@ def analyzeTrajData(file_ext, pos=0.064):
     print('The aperture is at z = 0.064 m.')
     print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos, pos-0.064))
     f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
+                'traj022':100, 'traj023':200}[file_ext]
 
-    dpos = pos
+    pos0 = pos
     pos *= 1000 # trajectory file data is in mm
     num = 0
     for i in range(len(f)):
@@ -743,25 +747,26 @@ def analyzeTrajData(file_ext, pos=0.064):
         elif not np.any(f[i]):
             found = False
 
-    xs = finals[:, 0] / 1000.
-    ys = finals[:, 1] / 1000.
-    zs = finals[:, 2] / 1000.
-    colour = plt.cm.Greens(100)
-    plt.plot(zs, np.sqrt(xs**2+ys**2), '+', c=colour, ms=13)
-    plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
-    plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
-    plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
-    plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
-    plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
-    plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
-    plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
-    plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
-    plt.xlim(0, dpos+0.01)
-    plt.show()
+    if plots == True:
+        xs = finals[:, 0] / 1000.
+        ys = finals[:, 1] / 1000.
+        zs = finals[:, 2] / 1000.
+        colour = plt.cm.Greens(100)
+        plt.plot(zs, np.sqrt(xs**2+ys**2), '+', c=colour, ms=13)
+        plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
+        plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
+        plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
+        plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
+        plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
+        plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
+        plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
+        plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+        plt.xlim(0, pos0+0.01)
+        plt.show()
 
     unique, counts = np.unique(finals[:, 2], return_counts=True)
     numArrived = counts[unique.tolist().index(pos)]
-    print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, dpos))
+
 
 
     pdata = finals[finals[:, 2]==pos]
@@ -770,35 +775,49 @@ def analyzeTrajData(file_ext, pos=0.064):
 #    rs = np.sqrt(xs**2 + ys**2)
     vrs = np.sqrt(vxs**2 + vys**2)
 
-    plt.plot(xs, ys, '.')
-    plt.xlabel('x, meters')
-    plt.ylabel('y, meters')
-    plt.title("Radial Positions at z = %g m"%dpos)
-    plt.tight_layout()
-    plt.show()
-#    plt.savefig('images/'+file_ext+'Pos%g.png')%pos
-    plt.clf()
+    if plots == True:
+        plt.plot(xs, ys, '.')
+        plt.xlabel('x, meters')
+        plt.ylabel('y, meters')
+        plt.title("Radial Positions at z = %g m"%pos0)
+        plt.tight_layout()
+        plt.show()
+#        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
+        plt.clf()
 
-    plt.plot(vrs, vzs, '.')
-    plt.title("Velocity Distribution at z = %g m"%dpos)
-    plt.ylabel('Axial velocity, m/s')
-    plt.xlabel('Radial velocity, m/s')
-    plt.tight_layout()
-    plt.show()
-#    plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
-    plt.clf()
-    plt.hist(vzs, bins=15)
-    plt.xlabel('Axial velocity, m/s')
-    plt.ylabel('Frequency')
-    plt.show()
-#    plt.savefig('images/hist.png')
+        plt.plot(vrs, vzs, '.')
+        plt.title("Velocity Distribution at z = %g m"%pos0)
+        plt.ylabel('Axial velocity, m/s')
+        plt.xlabel('Radial velocity, m/s')
+        plt.tight_layout()
+        plt.show()
+#        plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
+        plt.clf()
+        plt.hist(vzs, bins=15)
+        plt.xlabel('Axial velocity, m/s')
+        plt.ylabel('Frequency')
+        plt.show()
+#        plt.savefig('images/hist.png')
 
+    stdArrived = np.sqrt(float(numArrived)*(num-numArrived)/num)/num
+    spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
+    gamma = cross * flowrate * sccmSI / (0.05 * vMean)
+    print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, pos0))
+    print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
     print('Radial velocity at z = %g m: %.1f +- %.1f m/s'\
-          %(dpos, np.mean(vrs), np.std(vrs)))
+          %(pos0, np.mean(vrs), np.std(vrs)))
     print('Axial velocity at z = %g m: %.1f +- %.1f m/s'\
-          %(dpos, np.mean(vzs), np.std(vzs)))
+          %(pos0, np.mean(vzs), np.std(vzs)))
     print('Angular spread at z = %g m: %.1f deg \n'\
-          %(dpos, 180/np.pi * 2 * np.arctan(np.mean(vrs)/2/np.mean(vzs))))
+          %(pos0, spread))
+
+    if write == 1:
+        with open('data/TrajComparisons.dat', 'a') as tc:
+            tc.write('{:<8g}{:<7d}{:<8.3f}{:<13.3f}{:<8.3f}{:<7.1f}{:<8.1f}{:<7.1f}{:<8.1f}{:<1.1f}\n'\
+                     .format(pos0, flowrate, gamma, float(numArrived)/num, stdArrived, np.mean(vrs),\
+                      np.std(vrs), np.mean(vzs), np.std(vzs), spread))
+        tc.close()
+
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
