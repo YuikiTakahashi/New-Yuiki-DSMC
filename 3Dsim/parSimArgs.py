@@ -17,39 +17,6 @@ from multiprocessing import Pool
 import itertools
 import argparse
 
-parser = argparse.ArgumentParser('Simulation Specs')
-parser.add_argument('-ff', '--one') # Specify flowfield
-parser.add_argument('-out', '--two') # Specify output filename
-parser.add_argument('--mult', type=int) # Specify cross section multiplier (optional)
-args = parser.parse_args()
-
-FF = args.one
-outfile = args.two
-if args.mult:
-    crossMult = args.mult
-else:
-    crossMult = 5
-
-
-# =============================================================================
-# Constant Initialization
-# =============================================================================
-
-kb = 1.38 * 10**-23
-NA = 6.022 * 10**23
-T = 4 # Ambient temperature (K)
-T_s = 4 # Species temperature (K) for initial velocity distributions
-m = 0.004 / NA # Ambient gas mass (kg)
-M = .190061 / NA # Species mass (kg)
-massParam = 2 * m / (m + M)
-n = 10**21 # m^-3
-cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
-cross *= 4 # Rough estimate of He-YbOH cross sectional area
-cross *= crossMult # Manual adjustment to vary collision frequency
-
-# Global variable initialization: these values are irrelevant
-vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
-
 def set_derived_quants():
     '''
     This function must be run whenever n, T, T_s, vx, vy, or vz are changed.
@@ -64,7 +31,6 @@ def set_derived_quants():
     else: # Density is so low that collision frequency is near 0
         no_collide = True # Just don't collide.
 
-set_derived_quants()
 
 
 # =============================================================================
@@ -76,14 +42,14 @@ set_derived_quants()
 class vel_pdf(st.rv_continuous):
     def _pdf(self,x):
         return (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T))
-vel_cv = vel_pdf(a=0, b=4*vMean, name='vel_pdf') # vel_cv.rvs()
+
 
 # Maxwell-Boltzmann Velocity Distribution for species molecules
 # Used exclusively for setting initial velocities at a specified T_s
 class species_vel_pdf(st.rv_continuous):
     def _pdf(self,x):
         return (M/(2*np.pi*kb*T_s))**1.5 * 4*np.pi * x**2 * np.exp(-M*x**2/(2*kb*T_s))
-species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
+
 
 def coll_vel_pdf(x, y, z):
     '''
@@ -99,40 +65,17 @@ def coll_vel_pdf(x, y, z):
 class theta_pdf(st.rv_continuous):
     def _pdf(self,x):
         return np.sin(x)/2  # Normalized over its range [0, pi]
-theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
+
 
 # Define a PDF ~ cos(x) to be used for random determination of impact angle
 class Theta_pdf(st.rv_continuous):
     def _pdf(self,x):
         return -np.cos(x)  # Normalized over its range [pi/2, pi]
-Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
 
-# =============================================================================
-# Form-dependent parameter setup
-# =============================================================================
+#==============================================================================
+#Form-dependent parameter setup, must have axis-of-symmetry "wall" data
+#==============================================================================
 
-# =============================================================================
-# Must have axis-of-symmetry "wall" data in FF for this to work !!!
-# =============================================================================
-try:
-    flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
-    zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
-    vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
-    quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
-    grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
-    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
-    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
-    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
-    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
-    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
-    # These are interpolation functions:
-    f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
-    f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
-    f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
-    f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
-    f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
-except:
-    print("Note: No Flow Field DSMC data.")
 
 def dsmcQuant(x0, y0, z0, func):
     quant0 = func(z0, (x0**2 + y0**2)**0.5)[0][0]
@@ -349,6 +292,7 @@ def endPosition(extPos=0.12):
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                    round(vx,2), round(vy,2), round(vz,2)]))+'\n')
     traj.append(' '.join(map(str, [0,0,0,0,0,0]))+'\n')
+    print("Running")
     return traj
 
 
@@ -361,13 +305,98 @@ def showWalls():
     Generate a scatter plot of final positions of molecules as determined by
     the endPosition function parameters.
     '''
+    print("Started showWalls")
+    print("Running ff %s"%outfile)
     f = open(outfile, "w")
-    inputs = np.ones(100)*0.12
-    results = Parallel(n_jobs=-1)(delayed(endPosition)(i) for i in inputs)
+    inputs = np.ones(1000)*0.12
+    results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
 #    with Pool(processes=100) as pool:
 #        results = pool.map(endPosition, inputs, 1)
     f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)\n')
     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
     f.close()
 
-showWalls()
+
+if __name__ == '__main__':
+
+    print("Started main")
+
+    parser = argparse.ArgumentParser('Simulation Specs')
+    parser.add_argument('-ff', '--one') # Specify flowfield
+    parser.add_argument('-out', '--two') # Specify output filename
+    parser.add_argument('--mult', type=int) # Specify cross section multiplier (optional)
+    args = parser.parse_args()
+
+    FF = args.one
+    outfile = args.two
+    if args.mult:
+        crossMult = args.mult
+    else:
+        crossMult = 5
+
+    print("Step 1")
+    # =============================================================================
+    # Constant Initialization
+    # =============================================================================
+
+    kb = 1.38 * 10**-23
+    NA = 6.022 * 10**23
+    T = 4 # Ambient temperature (K)
+    T_s = 4 # Species temperature (K) for initial velocity distributions
+    m = 0.004 / NA # Ambient gas mass (kg)
+    M = .190061 / NA # Species mass (kg)
+    massParam = 2 * m / (m + M)
+    n = 10**21 # m^-3
+    cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
+    cross *= 4 # Rough estimate of He-YbOH cross sectional area
+    cross *= crossMult # Manual adjustment to vary collision frequency
+
+    # Global variable initialization: these values are irrelevant
+    vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
+
+    ptcl_count=0
+
+    set_derived_quants()
+
+    vel_cv = vel_pdf(a=0, b=4*vMean, name='vel_pdf') # vel_cv.rvs()
+    species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
+    theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
+    Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
+
+    print("Step 2")
+    # =============================================================================
+    # Form-dependent parameter setup
+    # =============================================================================
+
+    # =============================================================================
+    # Must have axis-of-symmetry "wall" data in FF for this to work !!!
+    # =============================================================================
+    try:
+        flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
+        print("Loaded flow field")
+        zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
+        print("1")
+        vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
+        quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
+        print("2")
+        grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+        grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
+        print("3")
+        grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
+        grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
+        grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
+        grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
+        print("Thru block 1")
+        # These are interpolation functions:
+        f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
+        f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
+        f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
+        f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
+        f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
+        print("Thru block 2")
+    except:
+        print("Note: No Flow Field DSMC data.")
+
+    print("Step 3")
+    showWalls()
+    print("Done")

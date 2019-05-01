@@ -10,8 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
 import scipy.interpolate as si
-import plotly as plo
-import plotly.graph_objs as go
+#import plotly as plo
+#import plotly.graph_objs as go
 import scipy.integrate as integrate
 
 # =============================================================================
@@ -717,9 +717,9 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False):
     '''
     print('The aperture is at z = 0.064 m.')
     print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos, pos-0.064))
-    f = np.loadtxt('/Users/Dave/Documents/2018 SURF/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+    f = np.loadtxt('/Users/HutzlerLab/Box/HutzlerLab/Data/Woolls_BG_Sims/NewDataH/%s.dat'%file_ext, skiprows=1)
     flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
-                'traj022':100, 'traj023':200}[file_ext]
+                'traj022':100, 'traj023':200,'flow_17_a':5,'flow_18_a':20,'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100}[file_ext]
 
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
@@ -810,7 +810,9 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False):
           %(pos0, np.mean(vzs), np.std(vzs)))
     print('Angular spread at z = %g m: %.1f deg \n'\
           %(pos0, spread))
-
+    
+    
+    
     if write == 1:
         with open('data/TrajComparisons.dat', 'a') as tc:
             tc.write('{:<8g}{:<7d}{:<8.3f}{:<13.3f}{:<8.3f}{:<7.1f}{:<8.1f}{:<7.1f}{:<8.1f}{:<1.1f}\n'\
