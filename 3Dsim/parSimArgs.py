@@ -261,6 +261,9 @@ def collide():
 # Simulation & Data Retrieval
 # =============================================================================
 
+#Returns traj, a list of strings containing position, velocity and times
+#of the trajectory
+#Gab: To every traj.append, added either a sim_time or a zero
 def endPosition(extPos=0.12):
     '''
     Return the final position of a particle somewhere in the cell or else
@@ -271,18 +274,25 @@ def endPosition(extPos=0.12):
     np.random.seed()
     x, y, z = initial_species_position(.01, 'currentCell')
     vx, vy, vz = initial_species_velocity(T_s0=4)
+
+    sim_time = 0.0 * 1000
+
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                        round(vx,2), round(vy,2), round(vz,2)]))+'\n')
+                                        round(vx,2), round(vy,2), round(vz,2), round(sim_time,4) ] ) )+'\n')
+
+    #Iterate updateParams() and update the particle position
     while inBounds(x, y, z, 'currentCell', extPos):
         # Typically takes few ms to leave box
         updateParams(x, y, z, 'currentCell')
         if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
             collide()
             traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                        round(vx,2), round(vy,2), round(vz,2)]))+'\n')
+                                        round(vx,2), round(vy,2), round(vz,2), round(sim_time, 4) ] ) )+'\n')
         x += vx * dt
         y += vy * dt
         z += vz * dt
+
+        sim_time += dt*1000
 
     if z > extPos:
         # Linearly backtrack to boundary
@@ -290,8 +300,8 @@ def endPosition(extPos=0.12):
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                   round(vx,2), round(vy,2), round(vz,2)]))+'\n')
-    traj.append(' '.join(map(str, [0,0,0,0,0,0]))+'\n')
+                                   round(vx,2), round(vy,2), round(vz,2), round(sim_time,4) ] ) )+'\n')
+    traj.append(' '.join(map(str, [0,0,0,0,0,0,0]))+'\n') #Added an extra zero
     print("Running")
     return traj
 
@@ -306,15 +316,23 @@ def showWalls():
     the endPosition function parameters.
     '''
     print("Started showWalls")
-    print("Running ff %s"%outfile)
+    print("Running flowfieldf %s"%FF)
+    print("Simulating %d particles"%PARTICLE_NUMBER)
+    print("Cross section multiplier %d"%crossMult)
     f = open(outfile, "w")
-    inputs = np.ones(1000)*0.12
+    inputs = np.ones(PARTICLE_NUMBER)*0.12
     results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
 #    with Pool(processes=100) as pool:
 #        results = pool.map(endPosition, inputs, 1)
-    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)\n')
+    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time(ms?)\n')
     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
     f.close()
+
+
+# =============================================================================
+# Had to wrap the script into a main method, otherwise parallelization ran
+# into issues when running the program on Windows - Gabe
+# =============================================================================
 
 
 if __name__ == '__main__':
@@ -324,17 +342,32 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Simulation Specs')
     parser.add_argument('-ff', '--one') # Specify flowfield
     parser.add_argument('-out', '--two') # Specify output filename
+
     parser.add_argument('--mult', type=int) # Specify cross section multiplier (optional)
+    parser.add_argument('--npar', type=int) #Specify number of particles to simulate (optional, defaults to 1)
+
     args = parser.parse_args()
 
     FF = args.one
     outfile = args.two
+
+##############
+
+    if args.npar:
+        PARTICLE_NUMBER = args.npar
+    else:
+        PARTICLE_NUMBER=1
+
+##############
+
     if args.mult:
         crossMult = args.mult
     else:
         crossMult = 5
 
     print("Step 1")
+    print("Particule number {0}, crossmult {1}".format(PARTICLE_NUMBER,crossMult))
+
     # =============================================================================
     # Constant Initialization
     # =============================================================================
