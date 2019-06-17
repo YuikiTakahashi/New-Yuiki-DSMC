@@ -269,38 +269,46 @@ def endPosition(extPos=0.12):
     Return the final position of a particle somewhere in the cell or else
     past the aperture within a distance extPos.
     '''
-    global vx, vy, vz
+    global vx, vy, vz, LITE_MODE
     traj = []
     np.random.seed()
     x, y, z = initial_species_position(.01, 'currentCell')
     vx, vy, vz = initial_species_velocity(T_s0=4)
 
-    sim_time = 0.0 * 1000
+    sim_time = 0.0
+    z_initial = z
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                        round(vx,2), round(vy,2), round(vz,2), round(sim_time,4) ] ) )+'\n')
+                                        round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
 
     #Iterate updateParams() and update the particle position
     while inBounds(x, y, z, 'currentCell', extPos):
         # Typically takes few ms to leave box
         updateParams(x, y, z, 'currentCell')
         if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
+
             collide()
-            traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                        round(vx,2), round(vy,2), round(vz,2), round(sim_time, 4) ] ) )+'\n')
+
+            #Print the full trajectory data ONLY if a) LITE_MODE=False, so we want all data,
+            #or b) if we are close enough to the aperture
+            if LITE_MODE == False or z > 0.0638:
+                    traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
+                                                round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
+
         x += vx * dt
         y += vy * dt
         z += vz * dt
-
-        sim_time += dt*1000
+        sim_time += dt
 
     if z > extPos:
         # Linearly backtrack to boundary
         z = extPos
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
+        sim_time -= (z-extPos) / vz
+
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
-                                   round(vx,2), round(vy,2), round(vz,2), round(sim_time,4) ] ) )+'\n')
+                                   round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
     traj.append(' '.join(map(str, [0,0,0,0,0,0,0]))+'\n') #Added an extra zero
     print("Running")
     return traj
@@ -324,14 +332,14 @@ def showWalls():
     results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
 #    with Pool(processes=100) as pool:
 #        results = pool.map(endPosition, inputs, 1)
-    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time(ms?)\n')
+    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
     f.close()
 
 
 # =============================================================================
 # Had to wrap the script into a main method, otherwise parallelization ran
-# into issues when running the program on Windows - Gabe
+# into issues when running the program on Windows - Gabriel
 # =============================================================================
 
 
@@ -343,30 +351,20 @@ if __name__ == '__main__':
     parser.add_argument('-ff', '--one') # Specify flowfield
     parser.add_argument('-out', '--two') # Specify output filename
 
-    parser.add_argument('--mult', type=int) # Specify cross section multiplier (optional)
-    parser.add_argument('--npar', type=int) #Specify number of particles to simulate (optional, defaults to 1)
-
+    parser.add_argument('--mult', type=int, dest='mult', action='store') # Specify cross section multiplier (optional)
+    parser.add_argument('--npar', type=int, dest='npar', action='store') #Specify number of particles to simulate (optional, defaults to 1)
+    parser.add_argument('--lite', dest='lite', action='store_true')
+    parser.set_defaults(lite=False, mult=5, npar=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
     FF = args.one
     outfile = args.two
 
-##############
+    PARTICLE_NUMBER = args.npar
+    crossMult = args.mult
+    LITE_MODE = args.lite
 
-    if args.npar:
-        PARTICLE_NUMBER = args.npar
-    else:
-        PARTICLE_NUMBER=1
-
-##############
-
-    if args.mult:
-        crossMult = args.mult
-    else:
-        crossMult = 5
-
-    print("Step 1")
-    print("Particule number {0}, crossmult {1}".format(PARTICLE_NUMBER,crossMult))
+    print("Particle number {0}, crossmult {1}, LITE_MODE is {2}".format(PARTICLE_NUMBER,crossMult,LITE_MODE))
 
     # =============================================================================
     # Constant Initialization
@@ -396,7 +394,6 @@ if __name__ == '__main__':
     theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
     Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
 
-    print("Step 2")
     # =============================================================================
     # Form-dependent parameter setup
     # =============================================================================

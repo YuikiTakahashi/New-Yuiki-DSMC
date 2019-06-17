@@ -716,41 +716,52 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
     The default value is set to the aperture position, 0.064 m.
     '''
     print('The aperture is at z = 0.064 m.')
-    print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos, pos-0.064))
 
-    #6xN array. Organized by x,y,z,vx,vy,vz
-    f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/NewDataH/%s.dat'%file_ext, skiprows=1)
+    #Coordinates of bowl center
+    x_center=0
+    y_center=0
+    z_center=64 #64 mm
+
+    pos0 = pos
+    pos *= 1000 # trajectory file data is in mm
+
+    if rad_mode == False:
+        print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
+        check_rad = pos - z_center
+        print("check_rad is equal to {0}".format(check_rad))
+        
+    elif rad_mode == True:
+        #Estimating the freezing point to be at 0.02 m past aperture
+        check_rad0 = check_rad
+        check_rad *= 1000 #file data is in mm
+        print('Analysis of data at dome r = %g m, centered at aperture:'%check_rad0)
+
+    #Nx6 array. Organized by x,y,z,vx,vy,vz
+    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/NewDataH/%s.dat'%file_ext, skiprows=1)
+    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+    
     flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
                 'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
                 'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
                 'try_1_succ':5}[file_ext]
 
-
-    #Estimating the freezing point to be at 0.02 m past aperture
-    check_rad0 = check_rad
-    check_rad *= 1000
     
-    #Coordinates of bowl center
-    x_center=0
-    y_center=0
-    z_center=64
-
-    pos0 = pos
-    pos *= 1000 # trajectory file data is in mm
     num = 0 #number of simulated particles
     for i in range(len(f)):
         if not np.any(f[i]):
             num += 1 # count number of particles simulated in file
-            
-    #Adding a 7th entry to array, for the radius from aperture center
-    finals = np.zeros((num, 7))
+
+    #Adding a 7th, 8th entries to array, for the radius from aperture center
+    #and the theta
+    finals = np.zeros((num, 8))
     j = 0
     for i in range(len(f)):
         if (not np.any(f[i])) and f[i-1][2] != 120 and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
-            
+
             x, y, z, vx, vy, vz = f[i-1] #Finds final row of data for adequate particles
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
-            finals[j] = np.array([x, y, z, vx, vy, vz, r])
+            theta = (180/np.pi) * np.arccos((z-z_center)/r)
+            finals[j] = np.array([x, y, z, vx, vy, vz, r, theta])
             j += 1
 
     found = False
@@ -763,43 +774,44 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
             x += vx * time
             y += vy * time
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
-            finals[j] = np.array([x, y, pos, vx, vy, vz, r]) 
+            theta = (180/np.pi) * np.arccos((z-z_center)/r)
+            finals[j] = np.array([x, y, pos, vx, vy, vz, r, theta])
             j += 1
             found = True
 
         elif found == False and f[i][2] >= pos and rad_mode == True:
-            
+
             past_rad = np.sqrt((f[i][0] - x_center)**2 + (f[i][1] - y_center)**2 + (f[i][2] - z_center)**2)
             #print("Dx=%6.4f, Dy=%6.4f, Dz=%6.4f"%(dx,dy,dz))
             #print("Radius past: %6.3f"%past_rad)
             if past_rad >= check_rad:
-                
+
                 x, y, z, vx, vy, vz = f[i-1]
-                
+
                 dx = x - x_center
                 dy = y - y_center
                 dz = z - z_center
-                
+
                 r = np.sqrt(dx**2 + dy**2 + dz**2)
-                theta = np.arccos(dz/r)
+                theta = (180/np.pi) * np.arccos(dz/r)
                 phi = np.arctan(dy/dx)
-                
+
                 dx = check_rad * np.sin(theta) * np.cos(phi)
                 dy = check_rad * np.sin(theta) * np.sin(phi)
                 dz = check_rad * np.cos(theta)
-                
+
 #                print("First x = %6.4f, y = %6.4f, z = %6.4f"%(x,y,z))
 #                print("First radius r = %6.2f"%r)
-#                
+#
                 x = x_center + dx
                 y = y_center + dy
                 z = z_center + dz
-                                               
+
               #  print("New x = %6.2f, y = %6.2f, z = %6.2f"%(x,y,z))
                 rnew = np.sqrt((x_center-x)**2 + (y_center-y)**2 + (z_center-z)**2)
                # print("New radius r = %6.2f"%rnew)
-                
-                finals[j] = np.array([x, y, z, vx, vy, vz, check_rad])
+
+                finals[j] = np.array([x, y, z, vx, vy, vz, check_rad, theta])
                 j += 1
                 found = True
 
@@ -822,100 +834,116 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
         plt.xlim(0, pos0+0.01)
         plt.show()
-        
+
+    #If analyzing an XY plane at z=pos
     if rad_mode == False:
         unique, counts = np.unique(finals[:, 2], return_counts=True)
-        numArrived = counts[unique.tolist().index(pos)]   
-        pdata = finals[finals[:, 2]==pos]
-        
-    
+        numArrived = counts[unique.tolist().index(pos)]
+        pdata = finals[finals[:, 2]==pos] #choose lines with z = pos
+
+    #If analyzing a *dome* with radius check_rad centered at aperture
     elif rad_mode == True:
         unique, counts = np.unique(finals[:, 6], return_counts=True)
         numArrived = counts[unique.tolist().index(check_rad)]
-        pdata = finals[finals[:, 6]==check_rad]
-        
+        pdata = finals[finals[:, 6]==check_rad] #choose lines with r = check_rad
 
-    
-    xs, ys, zs, vxs, vys, vzs = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
-                                pdata[:,3], pdata[:,4], pdata[:,5]
+
+
+    xs, ys, zs, vxs, vys, vzs, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
+                                pdata[:,3], pdata[:,4], pdata[:,5], pdata[:,7]
 #    rs = np.sqrt(xs**2 + ys**2)
     vrs = np.sqrt(vxs**2 + vys**2)
     rs = np.sqrt(xs**2+ys**2)
-    thetas = (180/np.pi) * np.arccos((zs-0.064)*(1/0.02))
+    #thetas = (180/np.pi) * np.arccos((zs-z_center)*(1/check_rad))
     phis = (180/np.pi) * np.arctan(ys/xs)
-    
+
+    #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
+    if rad_mode == True:
+        dep_title = " at r = {0} m".format(check_rad0)
+    else:
+        dep_title = " at z = {0} m".format(pos0) 
+
+    dep_title = dep_title + "\nFlowrate = {0}".format(flowrate)
+
     if plots == True:
         plt.plot(xs, ys, '.')
         plt.xlabel('x (meters)')
         plt.ylabel('y (meters)')
-        plt.title("Radial Positions at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+        plt.title("Radial Positions" + dep_title)
         #plt.title("Radial Positions at r = %g m"%check_rad)
         plt.tight_layout()
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
+#        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
         plt.show()
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
 
-        plt.title("Radial Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+        plt.title("Radial Distribution" + dep_title)
         #plt.title("Radial Distribution at r = %g m"%check_rad)
         plt.hist(rs,bins=20)
         plt.xlabel('Radius (m)')
         plt.ylabel('Frequency')
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_dist.png")
+#        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_dist.png")
         plt.show()
         plt.clf()
-        
-        
+
+
         plt.plot(vrs, vzs, '.')
-        plt.title("Velocity Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+        plt.title("Velocity Distribution" + dep_title)
         plt.ylabel('Axial velocity (m/s)')
         plt.xlabel('Radial velocity (m/s)')
         plt.tight_layout()
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/vel_scatter.png")
+#        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/vel_scatter.png")
         plt.show()
 #        plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
         plt.clf()
 
-        plt.title("Axial Velocity Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+        plt.title("Axial Velocity Distribution" + dep_title)
         plt.hist(vzs, bins=20, range=[0,130])
         plt.xlabel('Axial velocity (m/s)')
         plt.ylabel('Frequency')
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/axial_vel.png")
+#        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/axial_vel.png")
         plt.show()
 #        plt.savefig('images/hist.png')
         plt.clf()
 
-        plt.title("Radial Velocity Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+        plt.title("Radial Velocity Distribution" + dep_title)
         plt.hist(vrs, bins=20)
         plt.xlabel('Radial velocity (m/s)')
         plt.ylabel('Frequency')
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_vel.png")
+     #   plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_vel.png")
         plt.show()
         plt.clf()
-        
-        plt.title("Theta Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+
+        plt.title("Theta Distribution" + dep_title)
         plt.hist(thetas, bins=20)
         plt.xlabel("Theta (deg)")
         plt.ylabel("Frequency")
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/theta.png")
+    #    plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/theta.png")
         plt.show()
         plt.clf()
-        
-        plt.title("Phi Distribution at r = %g m\nFlowrate = %d"%(check_rad0,flowrate))
+
+        plt.title("Phi Distribution" + dep_title)
         plt.hist(phis, bins=20)
         plt.xlabel("Phi (deg)")
         plt.ylabel("Frequency")
-        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/phi.png")
+   #     plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/phi.png")
         plt.show()
         plt.clf()
-        
-            
-        
+
+
+
 
 
     stdArrived = np.sqrt(float(numArrived)*(num-numArrived)/num)/num
     spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
     gamma = cross * flowrate * sccmSI / (0.05 * vMean)
+    
+    if rad_mode == False:
+        print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
+        
+    elif rad_mode == True:
+        print('Analysis of data at dome r = %g m, centered at aperture:'%check_rad0)
+    
     print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, pos0))
     print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
     print('Radial velocity at z = %g m: %.1f +- %.1f m/s'\
@@ -924,7 +952,9 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
           %(pos0, np.mean(vzs), np.std(vzs)))
     print('Angular spread at z = %g m: %.1f deg \n'\
           %(pos0, spread))
-
+    
+    print('Theta dist at z = %g m: %.1f +- %.1f deg \n'\
+          %(pos0, np.mean(thetas), np.std(thetas)))
 
 
     if write == 1:
