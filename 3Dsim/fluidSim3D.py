@@ -27,8 +27,8 @@ m = 0.004 / NA # Ambient gas mass (kg)
 M = .190061 / NA # Species mass (kg)
 massParam = 2 * m / (m + M)
 n = 10**21 # m^-3
-cross = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
-cross *= 4 # Rough estimate of He-YbOH cross sectional area
+crossBB = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
+cross = 4*crossBB # Rough estimate of He-YbOH cross sectional area
 cross *= 5 # Manual
 
 # Global variable initialization: these values are irrelevant
@@ -706,7 +706,10 @@ def analyzeWallData(file_ext, pos):
           %((pos-0.064)*100, \
             180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
-def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02):
+##########################******************************#########################################
+
+
+def analyzeTrajData(file_ext, write_file, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -737,13 +740,14 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
 
     #Nx6 array. Organized by x,y,z,vx,vy,vz
-    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/NewDataH/%s.dat'%file_ext, skiprows=1)
-    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+    f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/TimeColumn/%s.dat'%file_ext, skiprows=1)
+    #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 
     flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
                 'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
                 'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
-                'try_1_succ':5}[file_ext]
+                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
+                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
 
 
     num = 0 #number of simulated particles
@@ -751,17 +755,21 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         if not np.any(f[i]):
             num += 1 # count number of particles simulated in file
 
-    #Adding a 7th, 8th entries to array, for the radius from aperture center
-    #and the theta
-    finals = np.zeros((num, 8))
+    #Adding a 7th, 8th, 9th entries to array for times, radii, thetas
+    #Output pdata will look like:
+    #[x, y, z, vx, vy, vz, t, r, theta]
+    #Recall that the output from simulation only comes with the first 7 of these
+
+    finals = np.zeros((num, 9))
     j = 0
     for i in range(len(f)):
         if (not np.any(f[i])) and f[i-1][2] != 120 and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
-
-            x, y, z, vx, vy, vz = f[i-1] #Finds final row of data for adequate particles
+            #Finds final row of data for adequate particles. Not condensed, but those that
+            #went past aperture. Maybe condensed in vacuum chamber?
+            x, y, z, vx, vy, vz, tim = f[i-1]
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
-            finals[j] = np.array([x, y, z, vx, vy, vz, r, theta])
+            finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
             j += 1
 
     found = False
@@ -769,13 +777,14 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         #If still looking and z coordinate is past the query boundary pos
         if found == False and f[i][2] >= pos and rad_mode == False:
             #Linearly backtrack to boundary at pos
-            x, y, z, vx, vy, vz = f[i-1]
-            time = (pos-z)/vz #Negative value
-            x += vx * time
-            y += vy * time
+            x, y, z, vx, vy, vz, tim = f[i-1]
+            delta_t = (pos-z)/vz #Negative value
+            x += vx * delta_t
+            y += vy * delta_t
+            tim += delta_t
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
-            finals[j] = np.array([x, y, pos, vx, vy, vz, r, theta])
+            finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
             j += 1
             found = True
 
@@ -786,32 +795,39 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
             #print("Radius past: %6.3f"%past_rad)
             if past_rad >= dome_rad:
 
-                x, y, z, vx, vy, vz = f[i-1]
+                x, y, z, vx, vy, vz, tim = f[i-1]
 
-                dx = x - x_center
-                dy = y - y_center
-                dz = z - z_center
+                dx0 = x - x_center
+                dy0 = y - y_center
+                dz0 = z - z_center
 
+                r0 = np.sqrt(dx0**2 + dy0**2 + dz0**2)
+                vr = (dx0*vx + dy0*vy + dz0*vz) / r0
+
+                # print("First (dx0,dy0,dz0) = ({0}, {1}, {2}), first radius = {3}, first time = {4}".format(dx0,dy0,dz0,r0,tim))
+                # print("\n")
+                delta_t = (dome_rad - r0) / vr
+                dx = dx0 + vx * delta_t
+                dy = dy0 + vy * delta_t
+                dz = dz0 + vz * delta_t
+
+                tim += delta_t
                 r = np.sqrt(dx**2 + dy**2 + dz**2)
                 theta = (180/np.pi) * np.arccos(dz/r)
-                phi = np.arctan(dy/dx)
 
-                dx = dome_rad * np.sin(theta) * np.cos(phi)
-                dy = dome_rad * np.sin(theta) * np.sin(phi)
-                dz = dome_rad * np.cos(theta)
+                #print("New (dx,dy,dz) = ({0}, {1}, {2}), new radius = {3}, new time = {4}".format(dx,dy,dz,r,tim))
+                #print("\n\n")
 
-#                print("First x = %6.4f, y = %6.4f, z = %6.4f"%(x,y,z))
-#                print("First radius r = %6.2f"%r)
-#
+                # phi = np.arctan(dy/dx)
+                # dx = dome_rad * np.sin(theta) * np.cos(phi)
+                # dy = dome_rad * np.sin(theta) * np.sin(phi)
+                # dz = dome_rad * np.cos(theta)
+
                 x = x_center + dx
                 y = y_center + dy
                 z = z_center + dz
 
-              #  print("New x = %6.2f, y = %6.2f, z = %6.2f"%(x,y,z))
-                rnew = np.sqrt((x_center-x)**2 + (y_center-y)**2 + (z_center-z)**2)
-               # print("New radius r = %6.2f"%rnew)
-
-                finals[j] = np.array([x, y, z, vx, vy, vz, dome_rad, theta])
+                finals[j] = np.array([x, y, z, vx, vy, vz, tim, dome_rad, theta])
                 j += 1
                 found = True
 
@@ -843,15 +859,19 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 
     #If analyzing a *dome* with radius dome_rad centered at aperture
     elif rad_mode == True:
-        unique, counts = np.unique(finals[:, 6], return_counts=True)
+        unique, counts = np.unique(finals[:, 7], return_counts=True)
         numArrived = counts[unique.tolist().index(dome_rad)]
-        pdata = finals[finals[:, 6]==dome_rad] #choose lines with r = dome_rad
+        pdata = finals[finals[:, 7]==dome_rad] #choose lines with r = dome_rad
 
 
-
-    xs, ys, zs, vxs, vys, vzs, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
-                                pdata[:,3], pdata[:,4], pdata[:,5], pdata[:,7]
+    #xs, ys, zs come in mm, times come in mm/s, velocities come in m/s
+    #Divide by a 1000 to convert
+    xs, ys, zs, vxs, vys, vzs, times, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
+                                pdata[:,3], pdata[:,4], pdata[:,5], pdata[:,6], pdata[:,8]
 #    rs = np.sqrt(xs**2 + ys**2)
+
+    print("Number arrived = {0}, size of xs = {1}".format(numArrived, xs.shape))
+
     vrs = np.sqrt(vxs**2 + vys**2)
     rs = np.sqrt(xs**2+ys**2)
     #thetas = (180/np.pi) * np.arccos((zs-z_center)*(1/dome_rad))
@@ -863,13 +883,13 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
     else:
         dep_title = " at z = {0} m".format(pos0)
 
-    dep_title = dep_title + "\nFlowrate = {0}".format(flowrate)
+    dep_title_flow = dep_title + "\nFlowrate = {0}".format(flowrate)
 
     if plots == True:
         plt.plot(xs, ys, '.')
         plt.xlabel('x (meters)')
         plt.ylabel('y (meters)')
-        plt.title("Radial Positions" + dep_title)
+        plt.title("Radial Positions" + dep_title_flow)
         #plt.title("Radial Positions at r = %g m"%dome_rad)
         plt.tight_layout()
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
@@ -877,7 +897,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
 
-        plt.title("Radial Distribution" + dep_title)
+        plt.title("Radial Distribution" + dep_title_flow)
         #plt.title("Radial Distribution at r = %g m"%dome_rad)
         plt.hist(rs,bins=20)
         plt.xlabel('Radius (m)')
@@ -888,7 +908,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 
 
         plt.plot(vrs, vzs, '.')
-        plt.title("Velocity Distribution" + dep_title)
+        plt.title("Velocity Distribution" + dep_title_flow)
         plt.ylabel('Axial velocity (m/s)')
         plt.xlabel('Radial velocity (m/s)')
         plt.tight_layout()
@@ -897,7 +917,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 #        plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
         plt.clf()
 
-        plt.title("Axial Velocity Distribution" + dep_title)
+        plt.title("Axial Velocity Distribution" + dep_title_flow)
         plt.hist(vzs, bins=20, range=[0,130])
         plt.xlabel('Axial velocity (m/s)')
         plt.ylabel('Frequency')
@@ -906,7 +926,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 #        plt.savefig('images/hist.png')
         plt.clf()
 
-        plt.title("Radial Velocity Distribution" + dep_title)
+        plt.title("Radial Velocity Distribution" + dep_title_flow)
         plt.hist(vrs, bins=20)
         plt.xlabel('Radial velocity (m/s)')
         plt.ylabel('Frequency')
@@ -914,7 +934,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         plt.show()
         plt.clf()
 
-        plt.title("Theta Distribution" + dep_title)
+        plt.title("Theta Distribution" + dep_title_flow)
         plt.hist(thetas, bins=20)
         plt.xlabel("Theta (deg)")
         plt.ylabel("Frequency")
@@ -922,7 +942,7 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         plt.show()
         plt.clf()
 
-        plt.title("Phi Distribution" + dep_title)
+        plt.title("Phi Distribution" + dep_title_flow)
         plt.hist(phis, bins=20)
         plt.xlabel("Phi (deg)")
         plt.ylabel("Frequency")
@@ -930,13 +950,21 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
         plt.show()
         plt.clf()
 
-
-
+        plt.title("Arrival Time Distribution"+ dep_title_flow)
+        plt.hist(times, bins=20)
+        plt.xlabel("Arrival times (ms)")
+        plt.ylabel("Frequency")
+        plt.show()
+        plt.clf()
 
 
     stdArrived = np.sqrt(float(numArrived)*(num-numArrived)/num)/num
     spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
+    spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
     gamma = cross * flowrate * sccmSI / (0.05 * vMean)
+    
+    #Estimating d_aperture = 0.0025
+    reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
 
     if rad_mode == False:
         print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
@@ -946,24 +974,165 @@ def analyzeTrajData(file_ext, pos=0.064, write=False, plots=False,rad_mode=False
 
     print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, pos0))
     print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
-    print('Radial velocity at z = %g m: %.1f +- %.1f m/s'\
-          %(pos0, np.mean(vrs), np.std(vrs)))
-    print('Axial velocity at z = %g m: %.1f +- %.1f m/s'\
-          %(pos0, np.mean(vzs), np.std(vzs)))
-    print('Angular spread at z = %g m: %.1f deg \n'\
-          %(pos0, spread))
+    print('Radial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
+          %(np.mean(vrs), np.std(vrs)))
+    print('Axial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
+          %(np.mean(vzs), np.std(vzs)))
+    print('Angular spread' + dep_title+ ': %.1f deg \n'\
+          %(spread))
 
-    print('Theta dist at z = %g m: %.1f +- %.1f deg \n'\
-          %(pos0, np.mean(thetas), np.std(thetas)))
+    print('Theta dist' + dep_title+ ': %.1f +- %.1f deg'\
+          %(np.mean(thetas), np.std(thetas)))
+    print('Pumpout time dist' + dep_title+ ': %.1f +- %.1f ms \n'\
+          %(np.mean(times), np.std(times)))
 
+    # return flowrate, dome_rad, vradMean, vradSD, axMean, axSD, spread, thetMean, thetSD, tMean, tSD
 
-    if write == 1:
-        with open('data/TrajComparisons.dat', 'a') as tc:
-            tc.write('{:<8g}{:<7d}{:<8.3f}{:<13.3f}{:<8.3f}{:<7.1f}{:<8.1f}{:<7.1f}{:<8.1f}{:<1.1f}\n'\
-                     .format(pos0, flowrate, gamma, float(numArrived)/num, stdArrived, np.mean(vrs),\
-                      np.std(vrs), np.mean(vzs), np.std(vzs), spread))
+    #David's file format
+    # if write == 1:
+    #     with open('data/TrajComparisons.dat', 'a') as tc:
+    #         tc.write('{:<8g}{:<7d}{:<8.3f}{:<13.3f}{:<8.3f}{:<7.1f}{:<8.1f}{:<7.1f}{:<8.1f}{:<1.1f}\n'\
+    #                  .format(pos0, flowrate, gamma, float(numArrived)/num, stdArrived, np.mean(vrs),\
+    #                   np.std(vrs), np.mean(vzs), np.std(vzs), spread))
+    #     tc.close()
+
+    if write == 1 and rad_mode==True:
+        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(write_file), 'a') as tc:
+            tc.write('  '.join(map(str, [dome_rad0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
+                     round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
+                     round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
+                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3)] ))+'\n')
+
         tc.close()
 
+    #These two are identical except for reporting the dome radius versus the plane distance
+    elif write == 1 and rad_mode==False:
+        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(write_file), 'a') as tc:
+            tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
+                     round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
+                     round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
+                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3)] ))+'\n')
+
+        tc.close()
+
+
+#Important: specifying radius also specifies labels for plots
+def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False):
+    fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
+
+    if write==True:
+        for f in fileList:
+            analyzeTrajData(f, out_file, write=True, rad_mode=True, dome_rad=radius)
+
+    if plot == True:
+        f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(in_file), skiprows=1)
+        
+        rs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+        
+        print("Rs: {},\n frs: {},\n gammas: {},\n times: {}".format(rs,frs,gammas,times))
+
+        plt.title("Pumpout time vs flowrate")
+        plt.errorbar(x=frs, y=times, yerr=timeSig, fmt='ro')
+        plt.ylabel("Arrival time at r={} m(ms)".format(radius))
+        plt.xlabel("Flowrate (SCCM)")
+        plt.show()
+        plt.clf()
+
+# =============================================================================
+# Important: specifing plane also specifies labels for plots. This means it is
+# best to keep each data file with the same plane position i.e. keep only a single
+# value for the zs
+# =============================================================================
+def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
+    fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
+
+    if write==True:
+        for f in fileList:
+            analyzeTrajData(f, file, pos=plane, write=True, rad_mode=False)
+
+    if plot == True:
+        f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(file), skiprows=1)
+
+        zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+
+        print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
+
+        plt.title("Pumpout Time vs Flowrate")
+        plt.errorbar(x=frs, y=times, yerr=timeSig, fmt='ro')
+        plt.xlabel("Flowrate (SCCM)")
+        plt.ylabel("Arrival time at z={} m".format(plane))
+        plt.show()
+        plt.clf()
+
+        plt.title("Angular Spread vs Flowrate")
+        plt.errorbar(x=frs, y=spreads, fmt='ro')
+        plt.xlabel("Flowrate (SCCM)")
+        plt.ylabel("Arrival time at z={} m".format(plane))
+        plt.show()
+        plt.clf()
+
+        plt.title("Extraction Rate vs Gamma")
+        plt.errorbar(x=gammas, y=ext, yerr=sigE,fmt='ro')
+        plt.xlabel("Gamma")
+        plt.ylabel("Fraction Extracted".format(plane))
+        plt.show()
+        plt.clf()
+        
+        plt.title("Forward Velocity vs Reynolds Number")
+        plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
+        plt.xlabel("Reynolds Number")
+        plt.ylabel("Forward Velocity (m/s)")
+        plt.show()
+        plt.clf()
+
+        plt.title("Forward Velocity FWHM vs Reynolds Number")
+        plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+        plt.xlabel("Reynolds Number")
+        plt.ylabel("Forward Velocity St. Dev.")
+        plt.show()
+        plt.clf()
+
+        plt.title("Forward Velocity FWHM vs Flowrate")
+        plt.errorbar(x=frs, y=vzSig, fmt='ro')
+        plt.xlabel("Flowrate (SCCM)")
+        plt.ylabel("Forward Velocity St. Dev.")
+        plt.show()
+        plt.clf()
+    
+        plt.title("Reynolds Number vs Flowrate")
+        plt.errorbar(x=frs, y=reyn, fmt='ro')
+        plt.ylabel("Reynolds Number")
+        plt.xlabel("Flowrate (SCCM)")
+        plt.show()
+        plt.clf()
+        
+        plt.title("Angular Spread vs Reynolds Number")
+        plt.errorbar(x=reyn, y=spreads, fmt='ro')
+        plt.xlabel("Reynolds Number")
+        plt.ylabel("Calculated Spread")
+        plt.show()
+        plt.clf()
+        
+        plt.title("Theta Std. Dev. vs Reynolds Number")
+        plt.errorbar(x=reyn, y=thetaSig, fmt='ro')
+        plt.xlabel("Reynolds Number")
+        plt.ylabel("Theta Stand. Dev.")
+        plt.show()
+        plt.clf()
+        
+        plt.title("OTHER Angular Spread vs Reynolds Number")
+        plt.errorbar(x=reyn, y=spreadB, fmt='ro')
+        plt.xlabel("Reynolds Number")
+        plt.ylabel("Calculated Spread B")
+        plt.show()
+        plt.clf()
+        
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")

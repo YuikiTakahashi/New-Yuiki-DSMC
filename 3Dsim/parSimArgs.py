@@ -269,14 +269,17 @@ def endPosition(extPos=0.12):
     Return the final position of a particle somewhere in the cell or else
     past the aperture within a distance extPos.
     '''
-    global vx, vy, vz, LITE_MODE
+
+    #LITE_MODE: if true, only write data to file once at the beginning, and when past the aperture.
+    #particle_count: tracks how many particles have been simulated so far
+    #PARTICLE_NUMBER: total number of particles to simulate.
+    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER
+
     traj = []
     np.random.seed()
     x, y, z = initial_species_position(.01, 'currentCell')
     vx, vy, vz = initial_species_velocity(T_s0=4)
-
-    sim_time = 0.0
-    z_initial = z
+    sim_time = 0.0 #Tracking simulation time
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                         round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
@@ -289,8 +292,8 @@ def endPosition(extPos=0.12):
 
             collide()
 
-            #Print the full trajectory data ONLY if a) LITE_MODE=False, so we want all data,
-            #or b) if we are close enough to the aperture
+            #Print the full trajectory ONLY if 1) LITE_MODE=False, so we want all data,
+            #or if 2) we are close enough to the aperture that we want to track regardless
             if LITE_MODE == False or z > 0.0638:
                     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                                 round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
@@ -302,15 +305,19 @@ def endPosition(extPos=0.12):
 
     if z > extPos:
         # Linearly backtrack to boundary
+        sim_time -= (z-extPos) / vz
+
         z = extPos
         x -= (z-extPos)/(vz * dt) * (vx * dt)
         y -= (z-extPos)/(vz * dt) * (vy * dt)
-        sim_time -= (z-extPos) / vz
+
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                    round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
     traj.append(' '.join(map(str, [0,0,0,0,0,0,0]))+'\n') #Added an extra zero
-    print("Running")
+
+    particle_count += 1
+    print("Running: {0}% complete".format(100*float(particle_count/PARTICLE_NUMBER)))
     return traj
 
 
@@ -324,9 +331,8 @@ def showWalls():
     the endPosition function parameters.
     '''
     print("Started showWalls")
-    print("Running flowfieldf %s"%FF)
-    print("Simulating %d particles"%PARTICLE_NUMBER)
-    print("Cross section multiplier %d"%crossMult)
+    print("Running flowfield %s"%FF)
+    print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
     f = open(outfile, "w")
     inputs = np.ones(PARTICLE_NUMBER)*0.12
     results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
@@ -351,7 +357,7 @@ if __name__ == '__main__':
     parser.add_argument('-ff', '--one') # Specify flowfield
     parser.add_argument('-out', '--two') # Specify output filename
 
-    parser.add_argument('--mult', type=int, dest='mult', action='store') # Specify cross section multiplier (optional)
+    parser.add_argument('--mult', type=float, dest='mult', action='store') # Specify cross section multiplier (optional)
     parser.add_argument('--npar', type=int, dest='npar', action='store') #Specify number of particles to simulate (optional, defaults to 1)
     parser.add_argument('--lite', dest='lite', action='store_true')
     parser.set_defaults(lite=False, mult=5, npar=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
@@ -385,7 +391,7 @@ if __name__ == '__main__':
     # Global variable initialization: these values are irrelevant
     vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
 
-    ptcl_count=0
+    particle_count=0
 
     set_derived_quants()
 
@@ -405,28 +411,28 @@ if __name__ == '__main__':
         flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
         print("Loaded flow field")
         zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
-        print("1")
+        #print("1")
         vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
-        print("2")
+        #print("2")
         grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
-        print("3")
+        #print("3")
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
         grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
         grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
         grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
-        print("Thru block 1")
+        #print("Thru block 1")
         # These are interpolation functions:
         f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
         f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
         f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
         f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
         f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
-        print("Thru block 2")
+        #print("Thru block 2")
     except:
         print("Note: No Flow Field DSMC data.")
 
-    print("Step 3")
+    #print("Step 3")
     showWalls()
     print("Done")
