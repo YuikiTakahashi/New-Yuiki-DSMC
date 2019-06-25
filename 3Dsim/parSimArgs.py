@@ -160,7 +160,7 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-    elif form == 'fCell':
+    elif form in ['fCell', 'gCell', 'hCell']:
         xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
         if abs(xFlow) > 1000:
             print(x, y, z, xFlow, 'm/s')
@@ -173,7 +173,7 @@ def setAmbientDensity(x, y, z, form='box'):
     global n
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
-    elif form == 'fCell':
+    elif form in ['fCell', 'gCell', 'hCell']:
         n = dsmcQuant(x, y, z, f1)
         if abs(n) > 1e26:
             print(x, y, z, n, 'm-3')
@@ -186,7 +186,7 @@ def setAmbientTemp(x, y, z, form='box'):
     global T
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
-    elif form == 'fCell':
+    elif form in ['fCell', 'gCell', 'hCell']:
         T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
             print(x, y, z, T, 'K')
@@ -256,7 +256,7 @@ def initial_species_position(L=0.01, form=''):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
-    if form != 'fCell':
+    if form not in ['fCell', 'gCell', 'hCell']:
         x = np.random.uniform(-L/2, L/2)
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
