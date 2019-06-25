@@ -2,10 +2,11 @@ import numpy as np
 import scipy.interpolate as si
 import argparse
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 
 
 def main():
-    global fdens, fmfp, Z_INFINITE, X0, Y0, SIZE, SIGMA
+    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
     print("Started main")
 
     parser = argparse.ArgumentParser('Simulation Specs')
@@ -16,12 +17,16 @@ def main():
 
     fdens = {}
     fmfp = {}
+    ftemp = {}
+    fvz = {}
+    fvr = {}
+    fvp = {}
 
     set_params(FF)
     plot_dens()
 
 def set_params(FF='DS2FF017d.DAT', x=0, y=0):
-    global fdens, fmfp, Z_INFINITE, X0, Y0, SIZE, SIGMA, flowrate
+    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA, flowrate
     X0 = x  #x, y coordinates in simulation site
     Y0 = y
     SIZE = 1000   #Size of z-arrays
@@ -29,57 +34,88 @@ def set_params(FF='DS2FF017d.DAT', x=0, y=0):
     SIGMA = 1e-14   #Cross section value
 
     flowrate = {'DS2FF017d.DAT':5, 'DS2FF018.DAT':20, 'DS2FF019.DAT':50, 'DS2FF020.DAT':10,\
-                'DS2FF021.DAT':2, 'DS2FF022.DAT':100, 'DS2FF023.DAT':200}[FF]
+                'DS2FF021.DAT':2, 'DS2FF022.DAT':100, 'DS2FF023.DAT':200, 'DS2FF024.DAT':201}[FF]
 
-    new_fdens, new_fmfp = set_field(FF)
+    new_fdens, new_fmfp, new_ftemp, new_fvz, new_fvr, new_fvp = set_field(FF)
+
     fdens.update({flowrate:new_fdens})
-    # fdens[flowrate] = new_fdens
-
+    ftemp.update({flowrate:new_ftemp})
+    fvz.update({flowrate:new_fvz})
+    fvr.update({flowrate:new_fvr})
+    fvp.update({flowrate:new_fvp})
     fmfp.update({flowrate:new_fmfp})
-    # fmfp[flowrate] = new_fmfp
 
 
 ##############################################################################
 ##********************** Flow field functions ***************************##
 ##############################################################################
 
-
-def get_dens(x, y, z, which_flow=5):
-    global fdens
-    d_field = fdens[which_flow]
-    quant0 = d_field(z, (x**2 + y**2)**0.5)[0][0]
-    return np.exp(quant0)
-
-def get_mfp(x, y, z, which_flow=5):
-    global fmfp
-    mfp_field = fmfp[which_flow]
-    quant0 = mfp_field(z, (x**2 + y**2)**0.5)[0][0]
-    return quant0
-
 def set_field(FF):
     try:
         flowField = np.loadtxt('flows/'+FF, skiprows=1) # Assumes only first row isn't data.
-        print("Loaded flow field")
+        print("Loaded flow field {}".format(FF))
 
-        zs, rs, dens = flowField[:, 0], flowField[:, 1], flowField[:, 2]
+        zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:,7]
 
-#        vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
+        vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
 #        quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
 
         mfps = flowField[:,14]
 
         grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
+        grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
+
+        print("Block 1")
+
+        grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
+        grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
+        grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
+
+        print("Block 2")
 
         grid_mfp = si.griddata(np.transpose([zs, rs]), mfps, (grid_x, grid_y), 'nearest')
+
+        print("Interpolating")
 
         #Interpolation functions:
         fdens = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
         fmfp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_mfp)
-        return fdens, fmfp
+        ftemp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
+        fvz = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
+        fvr = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
+        fvp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
+        return fdens, fmfp, ftemp, fvz, fvr, fvp
 
     except:
         print("Note: Failed Loading Flow Field DSMC data.")
+
+
+
+def get_dens(x, y, z, which_flow=5):
+    global fdens
+    d_field = fdens[which_flow]
+    logdens = d_field(z, (x**2 + y**2)**0.5)[0][0]
+    return np.exp(logdens)
+
+
+def get_mfp(x, y, z, which_flow=5):
+    global fmfp
+    mfp_field = fmfp[which_flow]
+    return mfp_field(z, (x**2 + y**2)**0.5)[0][0]
+
+
+def get_temp(x, y, z, which_flow):
+    global ftemp
+    temp_field = ftemp[which_flow]
+    return temp_field(z, (x**2+y**2)**0.5)[0][0]
+
+
+def get_vz(x, y, z, which_flow):
+    global fvz
+    vz_field = fvz[which_flow]
+    return vz_field(z, (x**2+y**2)**0.5)[0][0]
+
 
 ##############################################################################
 ##********************** Plotting functions  *******************************##
@@ -88,8 +124,8 @@ def set_field(FF):
 def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_arrays=False,log_scale=True):
     global fdens, flowrate
     z_array = np.linspace(z0, zf, num=array_size)
-    dz = (zf-z0)/array_size
-    print("Dz = {0}".format(dz))
+#    dz = (zf-z0)/array_size
+#    print("Dz = {0}".format(dz))
 
     density = np.ones(array_size)
     for i in range(array_size):
@@ -114,6 +150,8 @@ def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_a
     plt.xlabel('Z distance (m)')
     plt.axvline(x=0.064)
     plt.show()
+
+
 
 def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_arrays=False, log_scale=True):
     global fmfp
@@ -144,6 +182,56 @@ def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_ar
     plt.xlabel('Z distance (m)')
     plt.axvline(x=0.064)
     plt.show()
+
+
+def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow=5):
+
+    if quantity in ["density", "dens"]:
+        plot_density_field(rmax, z1, z2, array_size, which_flow)
+
+    else:
+        global fvz, ftemp, fmfp
+        fquant = {"vz":fvz, "temp":ftemp, "mfp":fmfp}[quantity]
+
+        quant_field = fquant[which_flow]
+
+        z_axis = np.linspace(z1, z2, num=array_size)
+        r_axis = np.linspace(0.0, rmax, num=array_size)
+
+        zv, rv = np.meshgrid(z_axis, r_axis)
+        quants = np.ones(zv.shape)
+
+        for i in range(array_size):
+            for j in range(array_size):
+                z = zv[i,j]
+                r = rv[i,j]
+                quants[i,j] = quant_field(z, r)[0][0]
+
+
+        plt.pcolormesh(zv, rv, quants)
+        plt.show()
+
+def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow=5):
+
+    z_axis = np.linspace(z1, z2, num=array_size)
+    r_axis = np.linspace(0.0, rmax, num=array_size)
+
+    zv, rv = np.meshgrid(z_axis, r_axis)
+    dens = np.ones(zv.shape)
+
+    for i in range(array_size):
+        for j in range(array_size):
+            z = zv[i,j]
+            r = rv[i,j]
+            dens[i,j] = get_dens(0, r, z, which_flow)
+
+    #print(dens)
+    plt.pcolormesh(zv, rv, dens)
+    plt.show()
+
+
+
+
 ##########################################################
 
 

@@ -32,6 +32,25 @@ def set_derived_quants():
         no_collide = True # Just don't collide.
 
 
+def get_flow_chars(filename):
+    '''
+    Retrieves the cell geometry and flowrate (in SCCM) from the FF filename.
+    The cell geometry is crucial for the simulation to work!
+    '''
+    global flowrate, geometry
+
+    #e.g. filename = DS2FFg020
+    if filename[0:5] == "DS2FF":
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[5]]
+        flowrate = int(filename[4:7])
+
+    #e.g. filename = DS2g020
+    elif filename[0:3] == "DS2":
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[3]]
+        flowrate = int(filename[4:7])
+
+    print(geometry)
+    print(flowrate)
 
 # =============================================================================
 # Probability Distribution Functions
@@ -101,12 +120,30 @@ def inBounds(x, y, z, form='box', endPos=0.12):
     '''
     if form in ['box', 'curvedFlowBox']:
         inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
-    elif form == 'currentCell':
+    elif form == 'fCell':
         r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in3 = r < 0.030 and z >= 0.0640 and z < endPos
         inside = in1 + in2 + in3
+
+    elif form == 'gCell':
+        r = np.sqrt(x**2+y**2)
+        in1 = r < 0.00635 and z > 0.015 and z < 0.05965
+        in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
+        in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in4 = r < 0.030 and z >= 0.0640 and z <  endPos
+        inside = in1 + in2 + in3 + in4
+
+    elif form == 'hCell':
+        r = np.sqrt(x**2+y**2)
+        in1 = r < 0.00635 and z > 0.015 and z < 0.05965
+        in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
+        in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in4 = r < z-0.0615 and z > 0.0640 and z < 0.06785
+        in5 = r < 0.030 and z >= 0.06785 and z < endPos #Remember to extend endPos!
+        inside = in1 + in2 + in3 + in4 + in5
+
     return inside
 
 def setAmbientFlow(x, y, z, form='box'):
@@ -123,7 +160,7 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-    elif form == 'currentCell':
+    elif form == 'fCell':
         xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
         if abs(xFlow) > 1000:
             print(x, y, z, xFlow, 'm/s')
@@ -136,7 +173,7 @@ def setAmbientDensity(x, y, z, form='box'):
     global n
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
-    elif form == 'currentCell':
+    elif form == 'fCell':
         n = dsmcQuant(x, y, z, f1)
         if abs(n) > 1e26:
             print(x, y, z, n, 'm-3')
@@ -149,7 +186,7 @@ def setAmbientTemp(x, y, z, form='box'):
     global T
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
-    elif form == 'currentCell':
+    elif form == 'fCell':
         T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
             print(x, y, z, T, 'K')
@@ -219,7 +256,7 @@ def initial_species_position(L=0.01, form=''):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
-    if form != 'currentCell':
+    if form != 'fCell':
         x = np.random.uniform(-L/2, L/2)
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
@@ -273,21 +310,25 @@ def endPosition(extPos=0.12):
     #LITE_MODE: if true, only write data to file once at the beginning, and when past the aperture.
     #particle_count: tracks how many particles have been simulated so far
     #PARTICLE_NUMBER: total number of particles to simulate.
-    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER
+
+    #Important: need to properly retrieve geometry
+    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER, geometry
 
     traj = []
     np.random.seed()
-    x, y, z = initial_species_position(.01, 'currentCell')
+    x, y, z = initial_species_position(.01, geometry)
     vx, vy, vz = initial_species_velocity(T_s0=4)
     sim_time = 0.0 #Tracking simulation time
+
+    print("Running")
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                         round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
 
     #Iterate updateParams() and update the particle position
-    while inBounds(x, y, z, 'currentCell', extPos):
+    while inBounds(x, y, z, geometry, extPos):
         # Typically takes few ms to leave box
-        updateParams(x, y, z, 'currentCell')
+        updateParams(x, y, z, geometry)
         if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
 
             collide()
@@ -316,8 +357,9 @@ def endPosition(extPos=0.12):
                                    round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
     traj.append(' '.join(map(str, [0,0,0,0,0,0,0]))+'\n') #Added an extra zero
 
-    particle_count += 1
-    print("Running: {0}% complete".format(100*float(particle_count/PARTICLE_NUMBER)))
+    #particle_count += 1
+    #print("Running: {0}% complete".format(100*float(particle_count/PARTICLE_NUMBER)))
+
     return traj
 
 
@@ -405,11 +447,16 @@ if __name__ == '__main__':
     # =============================================================================
 
     # =============================================================================
-    # Must have axis-of-symmetry "wall" data in FF for this to work !!!
+    # Must have axis-of-symmetry "wall" data in FF for this to work
     # =============================================================================
     try:
         flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
-        print("Loaded flow field")
+        #get_flow_chars(FF)
+        global geometry, flowrate
+        geometry = 'fCell'
+        flowrate = int(FF[-7:-4])
+        print("Loaded flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
+
         zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
         #print("1")
         vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]

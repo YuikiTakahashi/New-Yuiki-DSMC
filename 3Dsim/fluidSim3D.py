@@ -709,14 +709,18 @@ def analyzeWallData(file_ext, pos):
 ##########################******************************#########################################
 
 
-def analyzeTrajData(file_ext, write_file, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02):
+def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
     This function produces a graph of the end positions on the walls and
-    prints the number of molecules making it to the z-value "pos".
-    It then plots position/velocity distributions at "pos".
-    The default value is set to the aperture position, 0.064 m.
+    prints the number of molecules making it to the z-value "pos", if rad_mode
+    is False, or making it to the dome with radius dome_rad, if rad_mode is True.
+    In other words, rad_mode switches the final surface to analyze particles
+    between xy-planes and domes.
+    Plots position/velocity distributions at selected analysis surface.
+    The default xy-plane is set to the aperture position, z=0.064 m.
+    The default dome is set to radius r=0.02 m.
     '''
     print('The aperture is at z = 0.064 m.')
 
@@ -886,10 +890,12 @@ def analyzeTrajData(file_ext, write_file, pos=0.064, write=False, plots=False,ra
     dep_title_flow = dep_title + "\nFlowrate = {0}".format(flowrate)
 
     if plots == True:
-        plt.plot(xs, ys, '.')
-        plt.xlabel('x (meters)')
-        plt.ylabel('y (meters)')
-        plt.title("Radial Positions" + dep_title_flow)
+        plt.plot(100*xs, 100*ys, '.')
+        plt.xlim(-1,1)
+        plt.ylim(-1,1)
+        plt.xlabel('x (cm)')
+        plt.ylabel('y (cm)')
+        plt.title("Radial Scatter" + dep_title_flow)
         #plt.title("Radial Positions at r = %g m"%dome_rad)
         plt.tight_layout()
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
@@ -962,7 +968,7 @@ def analyzeTrajData(file_ext, write_file, pos=0.064, write=False, plots=False,ra
     spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
     spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
     gamma = cross * flowrate * sccmSI / (0.05 * vMean)
-    
+
     #Estimating d_aperture = 0.0025
     reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
 
@@ -1026,12 +1032,12 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 
     if plot == True:
         f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(in_file), skiprows=1)
-        
+
         rs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
         thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
         f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
         f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
-        
+
         print("Rs: {},\n frs: {},\n gammas: {},\n times: {}".format(rs,frs,gammas,times))
 
         plt.title("Pumpout time vs flowrate")
@@ -1083,7 +1089,7 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
         plt.ylabel("Fraction Extracted".format(plane))
         plt.show()
         plt.clf()
-        
+
         plt.title("Forward Velocity vs Reynolds Number")
         plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
         plt.xlabel("Reynolds Number")
@@ -1104,35 +1110,35 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
         plt.ylabel("Forward Velocity St. Dev.")
         plt.show()
         plt.clf()
-    
+
         plt.title("Reynolds Number vs Flowrate")
         plt.errorbar(x=frs, y=reyn, fmt='ro')
         plt.ylabel("Reynolds Number")
         plt.xlabel("Flowrate (SCCM)")
         plt.show()
         plt.clf()
-        
+
         plt.title("Angular Spread vs Reynolds Number")
         plt.errorbar(x=reyn, y=spreads, fmt='ro')
         plt.xlabel("Reynolds Number")
         plt.ylabel("Calculated Spread")
         plt.show()
         plt.clf()
-        
+
         plt.title("Theta Std. Dev. vs Reynolds Number")
         plt.errorbar(x=reyn, y=thetaSig, fmt='ro')
         plt.xlabel("Reynolds Number")
         plt.ylabel("Theta Stand. Dev.")
         plt.show()
         plt.clf()
-        
+
         plt.title("OTHER Angular Spread vs Reynolds Number")
         plt.errorbar(x=reyn, y=spreadB, fmt='ro')
         plt.xlabel("Reynolds Number")
         plt.ylabel("Calculated Spread B")
         plt.show()
         plt.clf()
-        
+
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
