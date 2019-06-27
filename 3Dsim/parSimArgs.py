@@ -16,6 +16,24 @@ from joblib import Parallel, delayed
 from multiprocessing import Pool
 import itertools
 import argparse
+import sys
+
+from collections import defaultdict
+
+class CallBack(object):
+    completed = defaultdict(int)
+
+    def __init__(self, index, parallel):
+        self.index = index
+        self.parallel = parallel
+
+    def __call__(self, index):
+        CallBack.completed[self.parallel] += 1
+        print("Done with {}".format(CallBack.completed[self.parallel]))
+        if self.parallel._original_iterable:
+            self.parallel.dispatch_next()
+import joblib.parallel
+joblib.parallel.CallBack = CallBack
 
 def set_derived_quants():
     '''
@@ -120,6 +138,7 @@ def inBounds(x, y, z, form='box', endPos=0.12):
     '''
     if form in ['box', 'curvedFlowBox']:
         inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
+
     elif form == 'fCell':
         r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
@@ -335,7 +354,7 @@ def endPosition(extPos=0.12):
 
             #Print the full trajectory ONLY if 1) LITE_MODE=False, so we want all data,
             #or if 2) we are close enough to the aperture that we want to track regardless
-            if LITE_MODE == False or z > 0.0638:
+            if LITE_MODE == False or z > 0.062:
                     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                                 round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
 
@@ -376,7 +395,20 @@ def showWalls():
     print("Running flowfield %s"%FF)
     print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
     f = open(outfile, "w")
-    inputs = np.ones(PARTICLE_NUMBER)*0.12
+
+    global geometry
+
+    if geometry == 'hCell':
+        default_endPos = 0.24
+    elif geometry in ['fCell', 'gCell']:
+        default_endPos = 0.12
+    else:
+        print("Failed: Did not recognize geometry")
+        sys.exit()
+
+    #(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
+    inputs = np.ones(PARTICLE_NUMBER) * default_endPos
+
     results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
 #    with Pool(processes=100) as pool:
 #        results = pool.map(endPosition, inputs, 1)
@@ -387,7 +419,7 @@ def showWalls():
 
 # =============================================================================
 # Had to wrap the script into a main method, otherwise parallelization ran
-# into issues when running the program on Windows - Gabriel
+# into issues when running the program on Windows
 # =============================================================================
 
 
@@ -479,7 +511,8 @@ if __name__ == '__main__':
         #print("Thru block 2")
     except:
         print("Note: No Flow Field DSMC data.")
+        sys.exit()
 
     #print("Step 3")
     showWalls()
-    print("Done")
+    print("Done: flowfield {0}, multiplier {1}".format(FF,crossMult))
