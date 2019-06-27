@@ -408,7 +408,7 @@ def showWalls():
         print("Failed: Did not recognize geometry")
         sys.exit()
 
-    plot_boundaries(endPoint=default_endPos)
+    #plot_boundaries(endPoint=default_endPos)
 
     #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
     inputs = np.ones(PARTICLE_NUMBER) * default_endPos

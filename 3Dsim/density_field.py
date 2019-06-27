@@ -26,15 +26,18 @@ def main():
     plot_dens()
 
 def set_params(FF='DS2FF017d.DAT', x=0, y=0):
-    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA, flowrate
+    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
     X0 = x  #x, y coordinates in simulation site
     Y0 = y
     SIZE = 1000   #Size of z-arrays
     Z_INFINITE = 0.120  #Endpoint for integration, i.e. the "infinity" point
     SIGMA = 1e-14   #Cross section value
 
-    flowrate = {'DS2FF017d.DAT':5, 'DS2FF018.DAT':20, 'DS2FF019.DAT':50, 'DS2FF020.DAT':10,\
-                'DS2FF021.DAT':2, 'DS2FF022.DAT':100, 'DS2FF023.DAT':200, 'DS2FF024.DAT':201}[FF]
+    #e.g. FF = F_Cell/DS2f020.DAT  or G_Cell/DS2g200.DAT
+    flowrate = FF[-8:-4] #e.g. 'f020'
+
+    #flowrate = {'DS2FF017d.DAT':5, 'DS2FF018.DAT':20, 'DS2FF019.DAT':50, 'DS2FF020.DAT':10,\
+    #            'DS2FF021.DAT':2, 'DS2FF022.DAT':100, 'DS2FF023.DAT':200, 'DS2FF024.DAT':201}[FF]
 
     new_fdens, new_fmfp, new_ftemp, new_fvz, new_fvr, new_fvp = set_field(FF)
 
@@ -92,20 +95,20 @@ def set_field(FF):
 
 
 
-def get_dens(x, y, z, which_flow=5):
+def get_dens(x, y, z, which_flow='f005'):
     global fdens
     d_field = fdens[which_flow]
     logdens = d_field(z, (x**2 + y**2)**0.5)[0][0]
     return np.exp(logdens)
 
 
-def get_mfp(x, y, z, which_flow=5):
+def get_mfp(x, y, z, which_flow='f005'):
     global fmfp
     mfp_field = fmfp[which_flow]
     return mfp_field(z, (x**2 + y**2)**0.5)[0][0]
 
 
-def get_temp(x, y, z, which_flow):
+def get_temp(x, y, z, which_flow='f005'):
     global ftemp
     temp_field = ftemp[which_flow]
     return temp_field(z, (x**2+y**2)**0.5)[0][0]
@@ -121,8 +124,8 @@ def get_vz(x, y, z, which_flow):
 ##********************** Plotting functions  *******************************##
 ##############################################################################
 
-def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_arrays=False,log_scale=True):
-    global fdens, flowrate
+def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False,log_scale=True):
+    global fdens
     z_array = np.linspace(z0, zf, num=array_size)
 #    dz = (zf-z0)/array_size
 #    print("Dz = {0}".format(dz))
@@ -153,7 +156,7 @@ def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_a
 
 
 
-def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_arrays=False, log_scale=True):
+def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False, log_scale=True):
     global fmfp
 
     z_array = np.linspace(z0, zf, num=array_size)
@@ -184,7 +187,7 @@ def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow=5, print_ar
     plt.show()
 
 
-def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow=5):
+def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow='f005'):
 
     if quantity in ["density", "dens"]:
         plot_density_field(rmax, z1, z2, array_size, which_flow)
@@ -211,7 +214,7 @@ def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, w
         plt.pcolormesh(zv, rv, quants)
         plt.show()
 
-def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow=5):
+def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow='f005'):
 
     z_axis = np.linspace(z1, z2, num=array_size)
     r_axis = np.linspace(0.0, rmax, num=array_size)
@@ -235,7 +238,7 @@ def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow=5):
 ##########################################################
 
 
-def get_ncoll(z0=0.064, zf=0.120, which_flow=5):
+def get_ncoll(z0=0.064, zf=0.120, which_flow='f005'):
     global SIGMA
 
     z_array = np.linspace(z0, zf, num=SIZE)
@@ -248,7 +251,7 @@ def get_ncoll(z0=0.064, zf=0.120, which_flow=5):
     ncol = np.trapz(y=prob, x=z_array)
     return ncol
 
-def plot_ncoll(numpoints=100, which_flow=5):
+def plot_ncoll(numpoints=100, which_flow='f005'):
 
     plot_zrange = np.linspace(0.064, 0.120, num=numpoints)
     plot_ncol = np.ones(numpoints)
