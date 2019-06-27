@@ -17,6 +17,7 @@ from multiprocessing import Pool
 import itertools
 import argparse
 import sys
+import matplotlib.pyplot as plt
 
 from collections import defaultdict
 
@@ -58,14 +59,14 @@ def get_flow_chars(filename):
     global flowrate, geometry
 
     #e.g. filename = DS2FFg020
-    if filename[0:5] == "DS2FF":
+    if filename[0:5] == "flows/DS2FF":
         geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[5]]
         flowrate = int(filename[4:7])
 
-    #e.g. filename = DS2g020
-    elif filename[0:3] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[3]]
-        flowrate = int(filename[4:7])
+    #e.g. filename = flows/G_Cell/DS2g020
+    elif filename[13:16] == "DS2":
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[16]]
+        flowrate = int(filename[17:20])
 
     print(geometry)
     print(flowrate)
@@ -394,6 +395,7 @@ def showWalls():
     print("Started showWalls")
     print("Running flowfield %s"%FF)
     print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
+
     f = open(outfile, "w")
 
     global geometry
@@ -406,17 +408,36 @@ def showWalls():
         print("Failed: Did not recognize geometry")
         sys.exit()
 
-    #(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
+    plot_boundaries(endPoint=default_endPos)
+
+    #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
     inputs = np.ones(PARTICLE_NUMBER) * default_endPos
 
-    results = Parallel(n_jobs=-1,max_nbytes=None)(delayed(endPosition)(i) for i in inputs)
+    results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(endPosition)(i) for i in inputs)
 #    with Pool(processes=100) as pool:
 #        results = pool.map(endPosition, inputs, 1)
     f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
     f.close()
 
+def plot_boundaries(endPoint=0.12):
+    global geometry
 
+    size=500
+
+    z_axis = np.linspace(0, endPoint, num=size)
+    r_axis = np.linspace(0, 0.03, num=size)
+
+    zv, rv = np.meshgrid(z_axis, r_axis)
+    inOrOut = np.ones(zv.shape)
+
+    for i in range(size):
+        for j in range(size):
+            inOrOut[i,j] = inBounds(x=0, y=rv[i,j], z=zv[i,j], form=geometry, endPos=endPoint)
+
+    plt.pcolormesh(zv, rv, inOrOut)
+    plt.show()
+    sys.exit()
 # =============================================================================
 # Had to wrap the script into a main method, otherwise parallelization ran
 # into issues when running the program on Windows
@@ -483,10 +504,10 @@ if __name__ == '__main__':
     # =============================================================================
     try:
         flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
-        #get_flow_chars(FF)
+        get_flow_chars(FF)
         global geometry, flowrate
-        geometry = 'fCell'
-        flowrate = int(FF[-7:-4])
+        #geometry = 'fCell'
+        #flowrate = int(FF[-7:-4])
         print("Loaded flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
 
         zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
