@@ -709,7 +709,7 @@ def analyzeWallData(file_ext, pos):
 ##########################******************************#########################################
 
 
-def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02):
+def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -743,16 +743,19 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         dome_rad *= 1000 #file data is in mm
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
 
+
     #Nx6 array. Organized by x,y,z,vx,vy,vz
-    f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/TimeColumn/%s.dat'%file_ext, skiprows=1)
+    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/HalfCross/%s_half.dat'%file_ext, skiprows=1)
+    f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/TimeColumn/%s_lite.dat'%file_ext, skiprows=1) 
+    
     #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 
-    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
-                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
-                'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
-                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
-                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
-
+#    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
+#                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
+#                'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
+#                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
+#                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
+    flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -764,6 +767,12 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     #[x, y, z, vx, vy, vz, t, r, theta]
     #Recall that the output from simulation only comes with the first 7 of these
 
+    if debug:
+        global debugf
+        debugf = open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/HalfCross/debug_{}.dat'.format(file_ext), 'a')
+
+
+    print("Number of particles: {}".format(num))
     finals = np.zeros((num, 9))
     j = 0
     for i in range(len(f)):
@@ -771,6 +780,10 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             #Finds final row of data for adequate particles. Not condensed, but those that
             #went past aperture. Maybe condensed in vacuum chamber?
             x, y, z, vx, vy, vz, tim = f[i-1]
+
+            if debug:
+                debugf.write(' '.join(map(str, [i-1, x, y, z, tim, j] ) )+' 01\n')
+
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
             finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
@@ -779,7 +792,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     found = False
     for i in range(len(f)):
         #If still looking and z coordinate is past the query boundary pos
-        if found == False and f[i][2] >= pos and rad_mode == False:
+        if found == False and f[i][2] > pos and rad_mode == False:
             #Linearly backtrack to boundary at pos
             x, y, z, vx, vy, vz, tim = f[i-1]
             delta_t = (pos-z)/vz #Negative value
@@ -788,11 +801,16 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             tim += delta_t
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
+
+            if debug:
+                #print("Writing to debug file on j {}".format(j))
+                debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
+
             finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
             j += 1
             found = True
 
-        elif found == False and f[i][2] >= pos and rad_mode == True:
+        elif found == False and f[i][2] > pos and rad_mode == True:
 
             past_rad = np.sqrt((f[i][0] - x_center)**2 + (f[i][1] - y_center)**2 + (f[i][2] - z_center)**2)
             #print("Dx=%6.4f, Dy=%6.4f, Dz=%6.4f"%(dx,dy,dz))
@@ -837,6 +855,10 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
         elif not np.any(f[i]):
             found = False
+
+    if debug:
+        print("Got to close")
+        debugf.close()
 
     if plots == True:
         xs = finals[:, 0] / 1000.
@@ -1053,14 +1075,16 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 # value for the zs
 # =============================================================================
 def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
-    fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
-
+    #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
+    fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
     if write==True:
         for f in fileList:
             analyzeTrajData(f, file, pos=plane, write=True, rad_mode=False)
 
     if plot == True:
-        f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(file), skiprows=1)
+
+        folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+        f = np.loadtxt(folder+file, skiprows=1)
 
         zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
         thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
@@ -1139,6 +1163,73 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
         plt.show()
         plt.clf()
 
+
+
+def series_multirate_plots(plane=0.064):
+
+    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic = {}, {}, {}, {}, {}, {}
+
+    folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+
+    fileList = ['HalfCross/plane_compar.dat', 'TimeColumn/comp_plane.dat']
+
+    legends = {'HalfCross/plane_compar.dat' : '0.5 Sigma',\
+               'TimeColumn/comp_plane.dat' : 'Sigma'}
+    formats = {'HalfCross/plane_compar.dat' : 'ro',\
+               'TimeColumn/comp_plane.dat' : 'bo'}
+    linestyles = {'HalfCross/plane_compar.dat' : ':',\
+               'TimeColumn/comp_plane.dat' : '--'}
+
+    for file in fileList:
+        f = np.loadtxt(folder+file, skiprows=1)
+
+        zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+
+        fr_dic.update( {file : frs} )
+        ext_dic.update( {file : ext} )
+        sigE_dic.update( {file : sigE} )
+        reyn_dic.update( {file : reyn} )
+        vz_dic.update( {file : vz} )
+        vzSig_dic.update( {file : vzSig} )
+
+    # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
+    
+    title_note = '\n (At aperture)'.format(1000*plane)
+    
+    plt.title("Extraction Rate vs Flowrate"+title_note)
+    plt.xlabel("Flowrate (SCCM)")
+    plt.ylabel("Fraction Extracted")
+    # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
+    for file in fileList:
+        plt.errorbar(x=fr_dic[file], y=ext_dic[file], yerr=sigE_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+
+
+    plt.title("Forward Velocity vs Reynolds Number"+title_note)
+    plt.xlabel("Reynolds Number")
+    plt.ylabel("Forward Velocity (m/s)")
+    # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
+    for file in fileList:
+        plt.errorbar(x=reyn_dic[file], y=vz_dic[file], yerr=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+
+
+    plt.title("Forward Velocity FWHM vs Reynolds Number"+title_note)
+    plt.xlabel("Reynolds Number")
+    plt.ylabel("Forward Velocity St. Dev.")
+    # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    for file in fileList:
+        plt.errorbar(x=reyn_dic[file], y=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
