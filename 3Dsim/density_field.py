@@ -2,16 +2,20 @@ import numpy as np
 import scipy.interpolate as si
 import argparse
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from matplotlib import ticker
 
+# =============================================================================
+# Always call main() first so that the quantity dictionaries get created
+# =============================================================================
 
 def main():
-    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
+    global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA, get_quantity_dic
     print("Started main")
 
     parser = argparse.ArgumentParser('Simulation Specs')
     parser.add_argument('-ff', dest='ff', action='store') # Specify flowfield
-    parser.set_defaults(ff='DS2FF017d.DAT')
+    parser.set_defaults(ff='F_Cell/DS2f005.DAT')
     args = parser.parse_args()
     FF = args.ff
 
@@ -23,9 +27,17 @@ def main():
     fvp = {}
 
     set_params(FF)
+    
+    get_quantity_dic = {'dens':get_dens, 'temp':get_temp, 'vz':get_vz, 'mfp':get_mfp}
+    
     plot_dens()
 
-def set_params(FF='DS2FF017d.DAT', x=0, y=0):
+def set_many():
+    flist = ['010','020','050','100','002']
+    for f in flist:
+        set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
+
+def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
     X0 = x  #x, y coordinates in simulation site
     Y0 = y
@@ -34,19 +46,19 @@ def set_params(FF='DS2FF017d.DAT', x=0, y=0):
     SIGMA = 1e-14   #Cross section value
 
     #e.g. FF = F_Cell/DS2f020.DAT  or G_Cell/DS2g200.DAT
-    flowrate = FF[-8:-4] #e.g. 'f020'
+    flowtype = FF[-8:-4] #e.g. 'f020'
 
     #flowrate = {'DS2FF017d.DAT':5, 'DS2FF018.DAT':20, 'DS2FF019.DAT':50, 'DS2FF020.DAT':10,\
     #            'DS2FF021.DAT':2, 'DS2FF022.DAT':100, 'DS2FF023.DAT':200, 'DS2FF024.DAT':201}[FF]
 
     new_fdens, new_fmfp, new_ftemp, new_fvz, new_fvr, new_fvp = set_field(FF)
 
-    fdens.update({flowrate:new_fdens})
-    ftemp.update({flowrate:new_ftemp})
-    fvz.update({flowrate:new_fvz})
-    fvr.update({flowrate:new_fvr})
-    fvp.update({flowrate:new_fvp})
-    fmfp.update({flowrate:new_fmfp})
+    fdens.update({flowtype:new_fdens})
+    ftemp.update({flowtype:new_ftemp})
+    fvz.update({flowtype:new_fvz})
+    fvr.update({flowtype:new_fvr})
+    fvp.update({flowtype:new_fvp})
+    fmfp.update({flowtype:new_fmfp})
 
 
 ##############################################################################
@@ -65,17 +77,17 @@ def set_field(FF):
 
         mfps = flowField[:,14]
 
+        print("Block 1: density and temperature")
+
         grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
 
-        print("Block 1")
+        print("Block 2: velocities and mfp")
 
         grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
         grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
         grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
-
-        print("Block 2")
 
         grid_mfp = si.griddata(np.transpose([zs, rs]), mfps, (grid_x, grid_y), 'nearest')
 
@@ -119,12 +131,11 @@ def get_vz(x, y, z, which_flow):
     vz_field = fvz[which_flow]
     return vz_field(z, (x**2+y**2)**0.5)[0][0]
 
+# =============================================================================
+# Single-field plotting functions
+# =============================================================================
 
-##############################################################################
-##********************** Plotting functions  *******************************##
-##############################################################################
-
-def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False,log_scale=True):
+def plot_dens(x0=0, y0=0, z0=0.010, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False,log_scale=True):
     global fdens
     z_array = np.linspace(z0, zf, num=array_size)
 #    dz = (zf-z0)/array_size
@@ -156,7 +167,7 @@ def plot_dens(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', pr
 
 
 
-def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False, log_scale=True):
+def plot_mfp(x0=0, y0=0, z0=0.010, zf=0.15, array_size = 100, which_flow='f005', print_arrays=False, log_scale=True):
     global fmfp
 
     z_array = np.linspace(z0, zf, num=array_size)
@@ -187,7 +198,7 @@ def plot_mfp(x0=0, y0=0, z0=0, zf=0.15, array_size = 100, which_flow='f005', pri
     plt.show()
 
 
-def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow='f005'):
+def plot_quant_field(quantity="temp", rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='f005', logscale=False):
 
     if quantity in ["density", "dens"]:
         plot_density_field(rmax, z1, z2, array_size, which_flow)
@@ -210,11 +221,13 @@ def plot_quant_field(quantity="temp", rmax=0.01, z1=0, z2=0.15, array_size=50, w
                 r = rv[i,j]
                 quants[i,j] = quant_field(z, r)[0][0]
 
-
-        plt.pcolormesh(zv, rv, quants)
+        if logscale:
+            plt.pcolormesh(zv, rv, quants, norm=colors.LogNorm(vmin=quants.min(),vmax=quants.max() ) )
+        else:
+            plt.pcolormesh(zv, rv, quants)    
         plt.show()
 
-def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow='f005'):
+def plot_density_field(rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='f005', logscale=False):
 
     z_axis = np.linspace(z1, z2, num=array_size)
     r_axis = np.linspace(0.0, rmax, num=array_size)
@@ -229,14 +242,55 @@ def plot_density_field(rmax=0.01, z1=0, z2=0.15, array_size=50, which_flow='f005
             dens[i,j] = get_dens(0, r, z, which_flow)
 
     #print(dens)
-    plt.pcolormesh(zv, rv, dens)
+    if logscale:
+        plt.pcolormesh(zv, rv, dens, norm=colors.LogNorm(vmin=dens.min(),vmax=dens.max() ) )
+    else:
+        plt.pcolormesh(zv, rv, dens)
+    
     plt.show()
 
+# =============================================================================
+# Multi-field plotting functions, for comparing different geometries/flowrates
+# at the aperture
+# =============================================================================
+def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.15, logscale=True):
+    
+    global get_quantity_dic
+    getter = get_quantity_dic[quantity] #select method get_dens, get_mfp, etc
+    
+    array_size=200
+    
+    title = {'mfp':'Mean Free Path', 'vz':'Forward Velocity', 'temp':'Temperature','dens':'Density'}[quantity]
+    
+    fig, ax = plt.subplots()
+    plt.title('Buffer Gas '+title)
+    
+    z_array = np.linspace(z0,zf,num=array_size)
+    #plt.title("Mean Free Path in Buffer Gas \n Flowrate = {} SCCM".format(which_flow))
+    
+    for f in flowList:
+        
+        quant_array = np.ones(array_size)
+        for i in range(array_size):
+            quant_array[i] = getter(x=0,y=0,z=z_array[i], which_flow=f)
+            
+        ax.plot(z_array, quant_array, label=f)
 
+    
+    if logscale:
+        plt.yscale('Log')
+        plt.ylabel('Log '+title)
+    else:
+        plt.ylabel(title)
 
+    plt.xlabel('Z distance (m)')
+    plt.legend()
+    plt.axvline(x=0.064)
+    plt.show()
 
-##########################################################
-
+# =============================================================================
+# Collision number calculations (probably useless)
+# =============================================================================
 
 def get_ncoll(z0=0.064, zf=0.120, which_flow='f005'):
     global SIGMA
