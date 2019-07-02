@@ -14,6 +14,8 @@ import plotly as plo
 import plotly.graph_objs as go
 import scipy.integrate as integrate
 
+from matplotlib.patches import Arc
+
 # =============================================================================
 # Constant Initialization
 # =============================================================================
@@ -745,10 +747,10 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
 
     #Nx6 array. Organized by x,y,z,vx,vy,vz
-    
+
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
     #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/HalfCross/%s_half.dat'%file_ext, skiprows=1)
-    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/DoubleCross/%s_double.dat'%file_ext, skiprows=1) 
+    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/DoubleCross/%s_double.dat'%file_ext, skiprows=1)
     #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 
     f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
@@ -903,9 +905,14 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     print("Number arrived = {0}, size of xs = {1}".format(numArrived, xs.shape))
 
     vrs = np.sqrt(vxs**2 + vys**2)
-    rs = np.sqrt(xs**2+ys**2)
+    rs = np.sqrt(xs**2+ys**2) #these radii are calculated from the z-axis, not from the pos origin
+
     #thetas = (180/np.pi) * np.arccos((zs-z_center)*(1/dome_rad))
     phis = (180/np.pi) * np.arctan(ys/xs)
+
+
+    median_radius = np.median(rs) #radius of cylinder containing 50% of the particles
+    print('Median radius: {}'.format(median_radius))
 
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
     if rad_mode == True:
@@ -916,12 +923,16 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     dep_title_flow = dep_title + "\nFlowrate = {0}".format(flowrate)
 
     if plots == True:
-        plt.plot(100*xs, 100*ys, '.')
+        fig, ax = plt.subplots()
+        plt.plot(100*xs, 100*ys, '.', zorder=1)
+        circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, zorder=2)
+        ax.add_patch(circ)
         plt.xlim(-1,1)
         plt.ylim(-1,1)
         plt.xlabel('x (cm)')
         plt.ylabel('y (cm)')
         plt.title("Radial Scatter" + dep_title_flow)
+        #plt.add_artist()
         #plt.title("Radial Positions at r = %g m"%dome_rad)
         plt.tight_layout()
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
@@ -1048,7 +1059,22 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         tc.close()
 
 
-#Important: specifying radius also specifies labels for plots
+
+# =============================================================================
+# Collimation-related methods
+# =============================================================================
+def find_half_radius(rs):
+    total = rs.size
+    print('Total particles: {}'.format(rs.size))
+
+    rs.sort
+
+
+
+
+
+
+    #Important: specifying radius also specifies labels for plots
 def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False):
     fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
 
@@ -1169,6 +1195,11 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
 
 
 
+
+# =============================================================================
+# Plotting quantities (extraction, forward velocity, forward temperature) for
+# for various sets of data e.g. different collision cross sections
+# =============================================================================
 def series_multirate_plots(plane=0.064):
 
     fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic = {}, {}, {}, {}, {}, {}
@@ -1204,9 +1235,9 @@ def series_multirate_plots(plane=0.064):
         vzSig_dic.update( {file : vzSig} )
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
-    
+
     title_note = '\n (At aperture)'.format(1000*plane)
-    
+
     plt.title("Extraction Rate vs Flowrate"+title_note)
     plt.xlabel("Flowrate (SCCM)")
     plt.ylabel("Fraction Extracted")
