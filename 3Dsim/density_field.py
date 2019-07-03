@@ -267,14 +267,17 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     
     z_array = np.linspace(z0,zf,num=array_size)
     #plt.title("Mean Free Path in Buffer Gas \n Flowrate = {} SCCM".format(which_flow))
-    
+    legends = {'f200' : 'Straight hole, 200 SCCM',\
+               'g200' : 'Bevel hole, 200 SCCM', \
+               'f005' : 'Straight hole, 5 SCCM',\
+               'g005' : 'Bevel hole, 5 SCCM'}
     for f in flowList:
         
         quant_array = np.ones(array_size)
         for i in range(array_size):
             quant_array[i] = getter(x=0,y=0,z=z_array[i], which_flow=f)
             
-        ax.plot(z_array, quant_array, label=f)
+        ax.plot(z_array, quant_array, label=legends[f])
 
     
     if logscale:

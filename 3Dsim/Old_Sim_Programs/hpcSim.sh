@@ -9,7 +9,13 @@
 #SBATCH -J "parSim"   # job name
 #SBATCH --qos=normal
 
+#SBATCH --mail-user=<your-email>@caltech.edu   # email address
+
+# Notify at the beginning, end of job and on failure.
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
 
 # LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
 module load python3/3.6.4
-python3 parSim.py
+python3 parSimCluster.py

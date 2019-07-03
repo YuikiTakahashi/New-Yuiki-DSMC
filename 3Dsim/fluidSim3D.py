@@ -749,11 +749,13 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     #Nx6 array. Organized by x,y,z,vx,vy,vz
 
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
-    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/HalfCross/%s_half.dat'%file_ext, skiprows=1)
-    #f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/DoubleCross/%s_double.dat'%file_ext, skiprows=1)
+    
     #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
-
-    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
+    #f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
+    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
+    #f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
+    #f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1) 
+#    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
@@ -761,7 +763,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 #                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
 #                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
-                'g200':200}[file_ext]
+                'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -912,26 +914,35 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
 
     median_radius = np.median(rs) #radius of cylinder containing 50% of the particles
-    print('Median radius: {}'.format(median_radius))
-
+    median_theta = np.median(thetas)
+    print('Median radius {0} mm, median theta {1} deg'.format(round(1000*median_radius,3), round(median_theta,3)) )
+    
+    
+    
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
     if rad_mode == True:
         dep_title = " at r = {0} m".format(dome_rad0)
     else:
-        dep_title = " at z = {0} m".format(pos0)
+        dep_title = " 3 cm from aperture".format(pos0)
 
-    dep_title_flow = dep_title + "\nFlowrate = {0}".format(flowrate)
+    dep_title_flow = dep_title + "\nFlowrate = {0} SCCM, straight hole".format(flowrate)
 
     if plots == True:
         fig, ax = plt.subplots()
+        ax.axis('equal')
         plt.plot(100*xs, 100*ys, '.', zorder=1)
-        circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, zorder=2)
+        circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, \
+                          zorder=2, label='Beam median radius: {} mm'.format(round(1000*median_radius,3)))
+        circ2 = plt.Circle((0,0), 0.0819, color='purple', fill=0, lw=2, \
+                          zorder=2, label='Beam at aperture: {} mm'.format(round(0.819,3)))
         ax.add_patch(circ)
+        ax.add_patch(circ2)
         plt.xlim(-1,1)
         plt.ylim(-1,1)
         plt.xlabel('x (cm)')
         plt.ylabel('y (cm)')
-        plt.title("Radial Scatter" + dep_title_flow)
+        plt.title("Radial scatter," + dep_title_flow)
+        plt.legend()
         #plt.add_artist()
         #plt.title("Radial Positions at r = %g m"%dome_rad)
         plt.tight_layout()
@@ -1059,21 +1070,6 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         tc.close()
 
 
-
-# =============================================================================
-# Collimation-related methods
-# =============================================================================
-def find_half_radius(rs):
-    total = rs.size
-    print('Total particles: {}'.format(rs.size))
-
-    rs.sort
-
-
-
-
-
-
     #Important: specifying radius also specifies labels for plots
 def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False):
     fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
@@ -1107,6 +1103,8 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
+    #fileList = ['g002','g005','g020','g050','g200']
+    
     if write==True:
         for f in fileList:
             analyzeTrajData(f, file, pos=plane, write=True, rad_mode=False)
@@ -1202,23 +1200,42 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
 # =============================================================================
 def series_multirate_plots(plane=0.064):
 
-    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic = {}, {}, {}, {}, {}, {}
+    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic = {},{},{},{},{},{},{}
 
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
-    fileList = ['HalfCross/plane_compar.dat', 'TimeColumn/comp_plane.dat',\
-                'DoubleCross/aperture_compare.dat']
+#    fileList = ['HalfCross/plane_compar.dat', 'TimeColumn/comp_plane.dat',\
+#                'DoubleCross/aperture_compare.dat']
+    
+    
+#    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
+#                'DoubleCross/far_plane.dat']
+        
+#    legends = {'HalfCross/far_plane.dat' : '0.5 Sigma',\
+#               'TimeColumn/far_plane.dat' : 'Sigma',\
+#               'DoubleCross/far_plane.dat' : '2 Sigma'}
+#    formats = {'HalfCross/far_plane.dat' : 'ro',\
+#               'TimeColumn/far_plane.dat' : 'bo',\
+#               'DoubleCross/far_plane.dat' : 'go'}
+#    linestyles = {'HalfCross/far_plane.dat' : ':',\
+#               'TimeColumn/far_plane.dat' : '--',\
+#               'DoubleCross/far_plane.dat':':'}
 
-    legends = {'HalfCross/plane_compar.dat' : '0.5 Sigma',\
-               'TimeColumn/comp_plane.dat' : 'Sigma',\
-               'DoubleCross/aperture_compare.dat' : '2 Sigma'}
-    formats = {'HalfCross/plane_compar.dat' : 'ro',\
-               'TimeColumn/comp_plane.dat' : 'bo',\
-               'DoubleCross/aperture_compare.dat' : 'go'}
-    linestyles = {'HalfCross/plane_compar.dat' : ':',\
-               'TimeColumn/comp_plane.dat' : '--',\
-               'DoubleCross/aperture_compare.dat':':'}
 
+    fileList = ['TimeColumn/far_plane.dat',\
+                'BevelGeometry/comp_aperture_inc_94.dat']
+    
+    legends = {'TimeColumn/far_plane.dat' : 'Straight Hole',\
+                'BevelGeometry/comp_aperture_inc_94.dat' : 'Beveled Aperture'}
+    
+    formats = {'TimeColumn/far_plane.dat' : 'go',\
+                'BevelGeometry/comp_aperture_inc_94.dat' : 'ro'}
+    
+    linestyles = {'TimeColumn/far_plane.dat' : '--',\
+                'BevelGeometry/comp_aperture_inc_94.dat' : ':'}
+
+    
+    
     for file in fileList:
         f = np.loadtxt(folder+file, skiprows=1)
 
@@ -1233,10 +1250,11 @@ def series_multirate_plots(plane=0.064):
         reyn_dic.update( {file : reyn} )
         vz_dic.update( {file : vz} )
         vzSig_dic.update( {file : vzSig} )
+        spreadB_dic.update( {file : spreadB} )
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (At aperture)'.format(1000*plane)
+    title_note = '\n (At z={} mm)'.format(1000*plane)
 
     plt.title("Extraction Rate vs Flowrate"+title_note)
     plt.xlabel("Flowrate (SCCM)")
@@ -1269,6 +1287,19 @@ def series_multirate_plots(plane=0.064):
     plt.legend()
     plt.show()
     plt.clf()
+    
+    
+    plt.title("Angular Spread vs Reynolds Number"+title_note)
+    plt.xlabel("Reynolds Number")
+    plt.ylabel("Angular Spread (deg)")
+    # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    for file in fileList:
+        plt.errorbar(x=reyn_dic[file], y=spreadB_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+    
+    
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
