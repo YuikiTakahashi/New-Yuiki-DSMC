@@ -27,9 +27,9 @@ def main():
     fvp = {}
 
     set_params(FF)
-    
+
     get_quantity_dic = {'dens':get_dens, 'temp':get_temp, 'vz':get_vz, 'mfp':get_mfp}
-    
+
     plot_dens()
 
 def set_many():
@@ -78,17 +78,17 @@ def set_field(FF):
         mfps = flowField[:,14]
 
         print("Block 1: density and temperature")
-        
+
         #Recall FF e.g.= F_Cell/DS2f200.DAT or G_Cell/DS2g005.DAT
-        if FF[10] in ['f', 'g']: 
+        if FF[10] in ['f', 'g']:
             print('{} geometry grid'.format(FF[10]))
-            grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.    
-        
+            grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+
         elif FF[10] in ['h']:
             print('H geometry grid'.format(FF[10]))
-            grid_x, grid_y = np.mgrid[0.010:0.24:9000j, 0:0.030:1500j] # high density, to be safe.    
-        
-        
+            grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.    
+
+
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
 
@@ -233,7 +233,7 @@ def plot_quant_field(quantity="temp", rmax=0.01, z1=0.010, z2=0.15, array_size=5
         if logscale:
             plt.pcolormesh(zv, rv, quants, norm=colors.LogNorm(vmin=quants.min(),vmax=quants.max() ) )
         else:
-            plt.pcolormesh(zv, rv, quants)    
+            plt.pcolormesh(zv, rv, quants)
         plt.show()
 
 def plot_density_field(rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='f005', logscale=False):
@@ -255,7 +255,7 @@ def plot_density_field(rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='
         plt.pcolormesh(zv, rv, dens, norm=colors.LogNorm(vmin=dens.min(),vmax=dens.max() ) )
     else:
         plt.pcolormesh(zv, rv, dens)
-    
+
     plt.show()
 
 # =============================================================================
@@ -263,17 +263,17 @@ def plot_density_field(rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='
 # at the aperture
 # =============================================================================
 def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.15, logscale=True):
-    
+
     global get_quantity_dic
     getter = get_quantity_dic[quantity] #select method get_dens, get_mfp, etc
-    
+
     array_size=200
-    
+
     title = {'mfp':'Mean Free Path', 'vz':'Forward Velocity', 'temp':'Temperature','dens':'Density'}[quantity]
-    
+
     fig, ax = plt.subplots()
     plt.title('Buffer Gas '+title)
-    
+
     z_array = np.linspace(z0,zf,num=array_size)
     #plt.title("Mean Free Path in Buffer Gas \n Flowrate = {} SCCM".format(which_flow))
     legends = {'f200' : 'Straight hole, 200 SCCM',\
@@ -281,14 +281,14 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
                'f005' : 'Straight hole, 5 SCCM',\
                'g005' : 'Bevel hole, 5 SCCM'}
     for f in flowList:
-        
+
         quant_array = np.ones(array_size)
         for i in range(array_size):
             quant_array[i] = getter(x=0,y=0,z=z_array[i], which_flow=f)
-            
+
         ax.plot(z_array, quant_array, label=legends[f])
 
-    
+
     if logscale:
         plt.yscale('Log')
         plt.ylabel('Log '+title)

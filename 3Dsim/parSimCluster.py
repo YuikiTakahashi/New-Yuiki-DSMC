@@ -423,7 +423,7 @@ def plot_boundaries(endPoint=0.12):
 # =============================================================================
 
 FF = 'flows/G_Cell/DS2g100.DAT'
-outfile = 'WoollsData/g100_cluster.dat'
+outfile = '/home/gwoolls/Gas-Simulation/3Dsim/WoollsData/g100_cluster.dat'
 
 
 PARTICLE_NUMBER = 1000

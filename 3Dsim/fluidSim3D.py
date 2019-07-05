@@ -711,7 +711,7 @@ def analyzeWallData(file_ext, pos):
 ##########################******************************#########################################
 
 
-def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False):
+def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -733,6 +733,9 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
+    
+    #Radius (mm) of the window for particle measurements. Only used if window=True
+    window_radius = 2.0 
 
     if rad_mode == False:
         print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
@@ -890,6 +893,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         unique, counts = np.unique(finals[:, 2], return_counts=True)
         numArrived = counts[unique.tolist().index(pos)]
         pdata = finals[finals[:, 2]==pos] #choose lines with z = pos
+        print('numArrived:{}, pdata: {}'.format(numArrived,pdata.shape))
 
     #If analyzing a *dome* with radius dome_rad centered at aperture
     elif rad_mode == True:
@@ -898,6 +902,17 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         pdata = finals[finals[:, 7]==dome_rad] #choose lines with r = dome_rad
 
 
+#    Add the possibility of restricting "final" particles to those in a small window
+    
+    if window==True:
+        #Restrict to particles with r <= 2.0
+        np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata1.dat', pdata)
+        
+        pdata = pdata[pdata[:,0]**2 + pdata[:,1]**2 <= window_radius**2]
+        numAnalyzing = pdata.shape[0]
+        
+        np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata2.dat', pdata)
+        
     #xs, ys, zs come in mm, times come in mm/s, velocities come in m/s
     #Divide by a 1000 to convert
     xs, ys, zs, vxs, vys, vzs, times, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
@@ -1021,13 +1036,17 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
 
     if rad_mode == False:
-        print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
+        print('\nAnalysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
 
     elif rad_mode == True:
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
 
     print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, pos0))
     print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
+    
+    if window:
+        print('Of these, {} fit in window of radius {} mm'.format(numAnalyzing,window_radius))
+    
     print('Radial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
           %(np.mean(vrs), np.std(vrs)))
     print('Axial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
@@ -1214,9 +1233,11 @@ def series_multirate_plots(plane=0.064):
     legends = {'HalfCross/far_plane.dat' : '0.5 Sigma',\
                'TimeColumn/far_plane.dat' : 'Sigma',\
                'DoubleCross/far_plane.dat' : '2 Sigma'}
+    
     formats = {'HalfCross/far_plane.dat' : 'ro',\
                'TimeColumn/far_plane.dat' : 'bo',\
                'DoubleCross/far_plane.dat' : 'go'}
+    
     linestyles = {'HalfCross/far_plane.dat' : ':',\
                'TimeColumn/far_plane.dat' : '--',\
                'DoubleCross/far_plane.dat':':'}
@@ -1261,7 +1282,7 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
     for file in fileList:
-        plt.errorbar(x=fr_dic[file], y=ext_dic[file], yerr=sigE_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:3], y=(ext_dic[file])[0:3], yerr=(sigE_dic[file])[0:3], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
