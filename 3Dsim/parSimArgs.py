@@ -515,7 +515,15 @@ if __name__ == '__main__':
         vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
         #print("2")
-        grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+
+        if geometry == 'fCell' or geometry == 'gCell':
+            grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+        elif geometry == 'hCell':
+            grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
+        else:
+            print('No geometry')
+            sys.exit()
+
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
         #print("3")
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')

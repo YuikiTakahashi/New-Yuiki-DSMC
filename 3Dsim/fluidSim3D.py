@@ -1208,31 +1208,31 @@ def series_multirate_plots(plane=0.064):
 #                'DoubleCross/aperture_compare.dat']
     
     
-#    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
-#                'DoubleCross/far_plane.dat']
+    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
+                'DoubleCross/far_plane.dat']
         
-#    legends = {'HalfCross/far_plane.dat' : '0.5 Sigma',\
-#               'TimeColumn/far_plane.dat' : 'Sigma',\
-#               'DoubleCross/far_plane.dat' : '2 Sigma'}
-#    formats = {'HalfCross/far_plane.dat' : 'ro',\
-#               'TimeColumn/far_plane.dat' : 'bo',\
-#               'DoubleCross/far_plane.dat' : 'go'}
-#    linestyles = {'HalfCross/far_plane.dat' : ':',\
-#               'TimeColumn/far_plane.dat' : '--',\
-#               'DoubleCross/far_plane.dat':':'}
+    legends = {'HalfCross/far_plane.dat' : '0.5 Sigma',\
+               'TimeColumn/far_plane.dat' : 'Sigma',\
+               'DoubleCross/far_plane.dat' : '2 Sigma'}
+    formats = {'HalfCross/far_plane.dat' : 'ro',\
+               'TimeColumn/far_plane.dat' : 'bo',\
+               'DoubleCross/far_plane.dat' : 'go'}
+    linestyles = {'HalfCross/far_plane.dat' : ':',\
+               'TimeColumn/far_plane.dat' : '--',\
+               'DoubleCross/far_plane.dat':':'}
 
 
-    fileList = ['TimeColumn/far_plane.dat',\
-                'BevelGeometry/comp_aperture_inc_94.dat']
-    
-    legends = {'TimeColumn/far_plane.dat' : 'Straight Hole',\
-                'BevelGeometry/comp_aperture_inc_94.dat' : 'Beveled Aperture'}
-    
-    formats = {'TimeColumn/far_plane.dat' : 'go',\
-                'BevelGeometry/comp_aperture_inc_94.dat' : 'ro'}
-    
-    linestyles = {'TimeColumn/far_plane.dat' : '--',\
-                'BevelGeometry/comp_aperture_inc_94.dat' : ':'}
+#    fileList = ['TimeColumn/far_plane.dat',\
+#                'BevelGeometry/comp_aperture_inc_94.dat']
+#    
+#    legends = {'TimeColumn/far_plane.dat' : 'Straight Hole',\
+#                'BevelGeometry/comp_aperture_inc_94.dat' : 'Beveled Aperture'}
+#    
+#    formats = {'TimeColumn/far_plane.dat' : 'go',\
+#                'BevelGeometry/comp_aperture_inc_94.dat' : 'ro'}
+#    
+#    linestyles = {'TimeColumn/far_plane.dat' : '--',\
+#                'BevelGeometry/comp_aperture_inc_94.dat' : ':'}
 
     
     
