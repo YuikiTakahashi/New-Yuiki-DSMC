@@ -396,7 +396,7 @@ def showWalls():
     print("Running flowfield %s"%FF)
     print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
 
-    f = open(outfile, "w")
+    f = open(outfile, "w+")
 
     global geometry
 
@@ -408,7 +408,7 @@ def showWalls():
         print("Failed: Did not recognize geometry")
         sys.exit()
 
-    #plot_boundaries(endPoint=default_endPos)
+    plot_boundaries(endPoint=default_endPos)
 
     #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
     inputs = np.ones(PARTICLE_NUMBER) * default_endPos
@@ -508,7 +508,7 @@ if __name__ == '__main__':
         global geometry, flowrate
         #geometry = 'fCell'
         #flowrate = int(FF[-7:-4])
-        print("Loaded flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
+        print("Loading flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
 
         zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
         #print("1")

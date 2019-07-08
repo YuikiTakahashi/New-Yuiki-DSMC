@@ -12,7 +12,11 @@ import scipy.stats as st
 import scipy.interpolate as si
 import plotly as plo
 import plotly.graph_objs as go
-import scipy.integrate as integrate
+
+import scipy.optimize as opt
+
+from scipy.stats import norm
+import matplotlib.mlab as mlab
 
 from matplotlib.patches import Arc
 
@@ -709,6 +713,33 @@ def analyzeWallData(file_ext, pos):
             180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
 ##########################******************************#########################################
+def fit_velocity_dist(vzs, vrs):
+    (mu,sigma) = norm.fit(vzs)
+    n, bins, patches = plt.hist(vzs,60,density=1,alpha=0.75)
+    y=mlab.normpdf(bins, mu, sigma)
+    lab = 'Mean: {}\nSig: {}\nFWHM: {}'.format(round(mu,3), round(sigma,3), round(2.355*sigma,3))
+    l = plt.plot(bins, y, 'r--', linewidth=2, label=lab)
+    plt.title('Forward Velocity Distribution')
+    plt.xlabel('Forward Velocity [m/s]')
+    plt.ylabel('Frequency')
+    plt.legend()
+    plt.show()
+    plt.clf()
+    
+    (mu,sigma) = norm.fit(vrs)
+    n, bins, patches = plt.hist(vrs,60,density=1,alpha=0.75)
+    y=mlab.normpdf(bins, mu, sigma)
+    lab = 'Mean: {}\nSig: {}\nFWHM: {}'.format(round(mu,3), round(sigma,3), round(2.355*sigma,3))
+    l = plt.plot(bins, y, 'r--', linewidth=2, label=lab)
+    plt.title('Transverse Velocity Distribution')
+    plt.xlabel('Transverse Velocity [m/s]')
+    plt.ylabel('Frequency')
+    plt.legend()
+    plt.show()
+    plt.clf()
+    
+
+
 
 
 def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
@@ -932,7 +963,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     median_theta = np.median(thetas)
     print('Median radius {0} mm, median theta {1} deg'.format(round(1000*median_radius,3), round(median_theta,3)) )
     
-    
+    fit_velocity_dist(vzs, vrs)
     
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
     if rad_mode == True:
@@ -966,14 +997,15 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
 
-        plt.title("Radial Distribution" + dep_title_flow)
-        #plt.title("Radial Distribution at r = %g m"%dome_rad)
-        plt.hist(rs,bins=20)
-        plt.xlabel('Radius (m)')
-        plt.ylabel('Frequency')
+
+#        plt.title("Radial Distribution" + dep_title_flow)
+#        #plt.title("Radial Distribution at r = %g m"%dome_rad)
+#        plt.hist(rs,bins=20)
+#        plt.xlabel('Radius (m)')
+#        plt.ylabel('Frequency')
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_dist.png")
-        plt.show()
-        plt.clf()
+#        plt.show()
+#        plt.clf()
 
 
         plt.plot(vrs, vzs, '.')
@@ -1219,41 +1251,46 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
 # =============================================================================
 def series_multirate_plots(plane=0.064):
 
-    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic = {},{},{},{},{},{},{}
+    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic = {},{},{},{},{},{},{},{}
 
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
-#    fileList = ['HalfCross/plane_compar.dat', 'TimeColumn/comp_plane.dat',\
-#                'DoubleCross/aperture_compare.dat']
+    fileList = ['HalfCross/plane_compar.dat',\
+                'TimeColumn/comp_plane.dat',\
+                'DoubleCross/aperture_compare.dat']
     
     
-    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
-                'DoubleCross/far_plane.dat']
+#    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
+#                'DoubleCross/far_plane.dat']
         
-    legends = {'HalfCross/far_plane.dat' : '0.5 Sigma',\
-               'TimeColumn/far_plane.dat' : 'Sigma',\
-               'DoubleCross/far_plane.dat' : '2 Sigma'}
+#    fileList = ['Window/plane94_halfcross.dat',\
+#                'Window/plane94_onecross.dat',\
+#                'Window/plane94_doublecross.dat']
+
+    legends = {fileList[0] : '0.5 Sigma',\
+               fileList[1] : 'Sigma',\
+               fileList[2] : '2 Sigma'}
     
-    formats = {'HalfCross/far_plane.dat' : 'ro',\
-               'TimeColumn/far_plane.dat' : 'bo',\
-               'DoubleCross/far_plane.dat' : 'go'}
+    formats = {fileList[0] : 'ro',\
+               fileList[1] : 'bo',\
+               fileList[2] : 'go'}
     
-    linestyles = {'HalfCross/far_plane.dat' : ':',\
-               'TimeColumn/far_plane.dat' : '--',\
-               'DoubleCross/far_plane.dat':':'}
+    linestyles = {fileList[0] : ':',\
+                  fileList[1] : '--',\
+                  fileList[2] :':'}
 
 
 #    fileList = ['TimeColumn/far_plane.dat',\
 #                'BevelGeometry/comp_aperture_inc_94.dat']
 #    
-#    legends = {'TimeColumn/far_plane.dat' : 'Straight Hole',\
-#                'BevelGeometry/comp_aperture_inc_94.dat' : 'Beveled Aperture'}
+#    legends = {fileList[0] : 'Straight Hole',\
+#               fileList[1] : 'Beveled Aperture'}
 #    
-#    formats = {'TimeColumn/far_plane.dat' : 'go',\
-#                'BevelGeometry/comp_aperture_inc_94.dat' : 'ro'}
+#    formats = {fileList[0] : 'go',\
+#               fileList[1] : 'ro'}
 #    
-#    linestyles = {'TimeColumn/far_plane.dat' : '--',\
-#                'BevelGeometry/comp_aperture_inc_94.dat' : ':'}
+#    linestyles = {fileList[0] : '--',\
+#                  fileList[1] : ':'}
 
     
     
@@ -1271,29 +1308,30 @@ def series_multirate_plots(plane=0.064):
         reyn_dic.update( {file : reyn} )
         vz_dic.update( {file : vz} )
         vzSig_dic.update( {file : vzSig} )
+        vrSig_dic.update( {file : vRSig})
         spreadB_dic.update( {file : spreadB} )
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (At z={} mm)'.format(1000*plane)
+    title_note = '\n (Small window at z={} mm)'.format(1000*plane)
 
-    plt.title("Extraction Rate vs Flowrate"+title_note)
-    plt.xlabel("Flowrate (SCCM)")
+    plt.title("Extraction vs Flow rate")
+    plt.xlabel("Flow [SCCM]")
     plt.ylabel("Fraction Extracted")
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
     for file in fileList:
-        plt.errorbar(x=(fr_dic[file])[0:3], y=(ext_dic[file])[0:3], yerr=(sigE_dic[file])[0:3], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:4], y=(ext_dic[file])[0:4], yerr=(sigE_dic[file])[0:4], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
 
 
-    plt.title("Forward Velocity vs Reynolds Number"+title_note)
-    plt.xlabel("Reynolds Number")
-    plt.ylabel("Forward Velocity (m/s)")
+    plt.title("Forward Velocity vs Flow rate"+title_note)
+    plt.xlabel("Flow [SCCM]")
+    plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
     for file in fileList:
-        plt.errorbar(x=reyn_dic[file], y=vz_dic[file], yerr=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=fr_dic[file], y=vz_dic[file], yerr=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1301,10 +1339,21 @@ def series_multirate_plots(plane=0.064):
 
     plt.title("Forward Velocity FWHM vs Reynolds Number"+title_note)
     plt.xlabel("Reynolds Number")
-    plt.ylabel("Forward Velocity St. Dev.")
+    plt.ylabel("Velocity FWHM [m/s]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
     for file in fileList:
-        plt.errorbar(x=reyn_dic[file], y=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=reyn_dic[file], y=2.355*vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+    
+    
+    plt.title("Transverse Velocity FWHM vs Reynolds Number"+'\n(At aperture)')
+    plt.xlabel("Reynolds Number (Re=3.44*flow)")
+    plt.ylabel("Velocity FWHM [m/s]")
+    # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    for file in fileList:
+        plt.errorbar(x=reyn_dic[file], y=2.355*vrSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1312,7 +1361,7 @@ def series_multirate_plots(plane=0.064):
     
     plt.title("Angular Spread vs Reynolds Number"+title_note)
     plt.xlabel("Reynolds Number")
-    plt.ylabel("Angular Spread (deg)")
+    plt.ylabel("Angular Spread [deg]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
     for file in fileList:
         plt.errorbar(x=reyn_dic[file], y=spreadB_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
