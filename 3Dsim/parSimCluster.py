@@ -20,6 +20,17 @@ import sys
 
 from collections import defaultdict
 
+FF = 'flows/G_Cell/DS2g100.DAT'
+outfile = 'g100_cluster.dat'
+PARTICLE_NUMBER = 1000
+crossMult = 5
+LITE_MODE = True
+#flowrate in SCCM
+flowrate = 200
+#fCell, gCell or hCell
+geometry = 'gCell'
+
+
 class CallBack(object):
     completed = defaultdict(int)
 
@@ -375,7 +386,7 @@ def showWalls():
     print("Running flowfield %s"%FF)
     print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
 
-    f = open(outfile, "w")
+    f = open(outfile, "w+")
 
     global geometry
 
@@ -422,19 +433,6 @@ def plot_boundaries(endPoint=0.12):
 # into issues when running the program on Windows
 # =============================================================================
 
-FF = 'flows/G_Cell/DS2g100.DAT'
-outfile = '/home/gwoolls/Gas-Simulation/3Dsim/WoollsData/g100_cluster.dat'
-
-
-PARTICLE_NUMBER = 1000
-crossMult = 5
-LITE_MODE = True
-
-#flowrate in SCCM
-flowrate = 200
-
-#fCell, gCell or hCell
-geometry = 'gCell'
 
 if __name__ == '__main__':
 
