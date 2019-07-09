@@ -786,10 +786,10 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     
     #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
     #f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
-    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
+    #f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1) 
-#    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
+    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
@@ -797,7 +797,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 #                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
 #                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
-                'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50}[file_ext]
+                'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1255,9 +1255,9 @@ def series_multirate_plots(plane=0.064):
 
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
-    fileList = ['HalfCross/plane_compar.dat',\
-                'TimeColumn/comp_plane.dat',\
-                'DoubleCross/aperture_compare.dat']
+#    fileList = ['HalfCross/plane_compar.dat',\
+#                'TimeColumn/comp_plane.dat',\
+#                'DoubleCross/aperture_compare.dat']
     
     
 #    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
@@ -1266,31 +1266,31 @@ def series_multirate_plots(plane=0.064):
 #    fileList = ['Window/plane94_halfcross.dat',\
 #                'Window/plane94_onecross.dat',\
 #                'Window/plane94_doublecross.dat']
+#
+#    legends = {fileList[0] : '0.5 Sigma',\
+#               fileList[1] : 'Sigma',\
+#               fileList[2] : '2 Sigma'}
+#    
+#    formats = {fileList[0] : 'ro',\
+#               fileList[1] : 'bo',\
+#               fileList[2] : 'go'}
+#    
+#    linestyles = {fileList[0] : ':',\
+#                  fileList[1] : '--',\
+#                  fileList[2] :':'}
 
-    legends = {fileList[0] : '0.5 Sigma',\
-               fileList[1] : 'Sigma',\
-               fileList[2] : '2 Sigma'}
+
+    fileList = ['TimeColumn/plane94_window.dat',\
+                'BevelGeometry/plane94_window.dat']
     
-    formats = {fileList[0] : 'ro',\
-               fileList[1] : 'bo',\
-               fileList[2] : 'go'}
+    legends = {fileList[0] : 'Straight Hole',\
+               fileList[1] : 'Beveled Aperture'}
     
-    linestyles = {fileList[0] : ':',\
-                  fileList[1] : '--',\
-                  fileList[2] :':'}
-
-
-#    fileList = ['TimeColumn/far_plane.dat',\
-#                'BevelGeometry/comp_aperture_inc_94.dat']
-#    
-#    legends = {fileList[0] : 'Straight Hole',\
-#               fileList[1] : 'Beveled Aperture'}
-#    
-#    formats = {fileList[0] : 'go',\
-#               fileList[1] : 'ro'}
-#    
-#    linestyles = {fileList[0] : '--',\
-#                  fileList[1] : ':'}
+    formats = {fileList[0] : 'go',\
+               fileList[1] : 'ro'}
+    
+    linestyles = {fileList[0] : '--',\
+                  fileList[1] : ':'}
 
     
     
@@ -1318,6 +1318,7 @@ def series_multirate_plots(plane=0.064):
     plt.title("Extraction vs Flow rate")
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Fraction Extracted")
+    plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
     for file in fileList:
         plt.errorbar(x=(fr_dic[file])[0:4], y=(ext_dic[file])[0:4], yerr=(sigE_dic[file])[0:4], label=legends[file], fmt=formats[file],ls=linestyles[file])
@@ -1331,18 +1332,18 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
     for file in fileList:
-        plt.errorbar(x=fr_dic[file], y=vz_dic[file], yerr=vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:5], y=(vz_dic[file])[0:5], yerr=(vzSig_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
 
 
-    plt.title("Forward Velocity FWHM vs Reynolds Number"+title_note)
-    plt.xlabel("Reynolds Number")
+    plt.title("Forward Velocity FWHM vs Flow rate"+title_note)
+    plt.xlabel("Flow [SCCM]")
     plt.ylabel("Velocity FWHM [m/s]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
     for file in fileList:
-        plt.errorbar(x=reyn_dic[file], y=2.355*vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=fr_dic[file], y=2.355*vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
