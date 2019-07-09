@@ -789,15 +789,16 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     #f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1) 
-    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
-
+    #f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
+    f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1) 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
 #                'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
 #                'lite10':5, 'f17_lite':5, 'f18_lite':20, 'f19_lite':50,\
 #                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
-                'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100}[file_ext]
+                'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
+                'h005_larg':5, 'h005_larg2':5, 'h005_cluster':5}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -811,11 +812,12 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
     if debug:
         global debugf
-        debugf = open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/HalfCross/debug_{}.dat'.format(file_ext), 'a')
+        #debugf = open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ClusterLaval/debug_{}.dat'.format(file_ext), 'a')
 
 
     print("Number of particles: {}".format(num))
-    finals = np.zeros((num, 9))
+    #finals = np.zeros((num, 9))
+    finals = np.zeros((1,9))
     j = 0
     for i in range(len(f)):
         if (not np.any(f[i])) and f[i-1][2] != 120 and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
@@ -824,11 +826,14 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             x, y, z, vx, vy, vz, tim = f[i-1]
 
             if debug:
-                debugf.write(' '.join(map(str, [i-1, x, y, z, tim, j] ) )+' 01\n')
+                print("Writing to debug file on j={}, file row {}, block {}".format(j, i-1, 'A'))
+#                debugf.write(' '.join(map(str, [i-1, x, y, z, tim, j] ) )+' 01\n')
 
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
-            finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
+            
+            finals = np.append(finals, np.array([x, y, z, vx, vy, vz, tim, r, theta]),axis=0)
+            #finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
             j += 1
 
     found = False
@@ -845,10 +850,12 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
 
             if debug:
-                #print("Writing to debug file on j {}".format(j))
-                debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
+                print("Writing to debug file on j={}, file row {}, block {}".format(j, i-1, 'B'))
+                #debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
 
-            finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
+            #finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
+            finals = np.append(finals, np.array([x, y, pos, vx, vy, vz, tim, r, theta]),axis=0)
+            
             j += 1
             found = True
 
@@ -897,7 +904,8 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
         elif not np.any(f[i]):
             found = False
-
+        
+    print("FINALS SIZE {}".format(finals.shape))
     if debug:
         print("Got to close")
         debugf.close()
