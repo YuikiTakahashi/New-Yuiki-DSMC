@@ -524,20 +524,25 @@ if __name__ == '__main__':
             print('No geometry')
             sys.exit()
 
+        print("Block 1: density and temperature")
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
-        #print("3")
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
+
+        print("Block 2: velocities")
+
         grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
         grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
         grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
-        #print("Thru block 1")
+
+        print("Interpolating")
         # These are interpolation functions:
         f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
         f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
         f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
         f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
         f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
-        #print("Thru block 2")
+
+        print("Done loading flow field")
     except:
         print("Note: No Flow Field DSMC data.")
         sys.exit()
