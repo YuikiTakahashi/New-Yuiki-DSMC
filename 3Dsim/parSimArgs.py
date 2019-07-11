@@ -17,7 +17,7 @@ from multiprocessing import Pool
 import itertools
 import argparse
 import sys
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 from collections import defaultdict
 
