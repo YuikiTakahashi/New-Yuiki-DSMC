@@ -281,17 +281,19 @@ def initial_species_position(L=0.01, form='', mode=0):
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
     else:
-        if mode==0:
-            r = np.random.uniform(0, 0.002)
-            ang = np.random.uniform(0, 2*np.pi)
-            x, y = r * np.cos(ang), r * np.sin(ang)
-            z = np.random.uniform(0.035, 0.045)
         #Larger initial distribution of particles
-        elif mode==1:
+        if mode==1:
             r = np.random.uniform(0, 0.004)
             ang = np.random.uniform(0, 2*np.pi)
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.030, 0.040)
+
+        elif mode==0:
+            r = np.random.uniform(0, 0.002)
+            ang = np.random.uniform(0, 2*np.pi)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+            z = np.random.uniform(0.035, 0.045)
+            
     return x, y, z
 
 def collide():
@@ -341,13 +343,13 @@ def endPosition(extPos=0.12):
     #Important: need to properly retrieve geometry
     global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER, geometry, INIT_MODE
 
+    print("Running, INIT = {}".format(INIT_MODE))
+
     traj = []
     np.random.seed()
-    x, y, z = initial_species_position(.01, geometry, INIT_MODE)
+    x, y, z = initial_species_position(L=.01, form=geometry, mode=INIT_MODE)
     vx, vy, vz = initial_species_velocity(T_s0=4)
     sim_time = 0.0 #Tracking simulation time
-
-    print("Running")
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                         round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
@@ -405,7 +407,7 @@ def showWalls():
 
     f = open(outfile, "w+")
 
-    global geometry
+    global geometry, INIT_MODE
 
     if geometry == 'hCell':
         default_endPos = 0.24
@@ -463,7 +465,7 @@ if __name__ == '__main__':
     parser.add_argument('--npar', type=int, dest='npar', action='store') #Specify number of particles to simulate (optional, defaults to 1)
     parser.add_argument('--lite', dest='lite', action='store_true')
 
-    parser.add_argument('--init_mode',dest='init_mode', action='store')
+    parser.add_argument('--init_mode', type=int, dest='init_mode', action='store')
     parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
