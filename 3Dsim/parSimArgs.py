@@ -272,7 +272,7 @@ def initial_species_velocity(T_s0):
                        *np.sin(phi), v0*np.cos(theta))
     return Vx, Vy, Vz
 
-def initial_species_position(L=0.01, form=''):
+def initial_species_position(L=0.01, form='', mode=0):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
@@ -281,10 +281,17 @@ def initial_species_position(L=0.01, form=''):
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
     else:
-        r = np.random.uniform(0, 0.002)
-        ang = np.random.uniform(0, 2*np.pi)
-        x, y = r * np.cos(ang), r * np.sin(ang)
-        z = np.random.uniform(0.035, 0.045)
+        if mode==0:
+            r = np.random.uniform(0, 0.002)
+            ang = np.random.uniform(0, 2*np.pi)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+            z = np.random.uniform(0.035, 0.045)
+        #Larger initial distribution of particles
+        elif mode==1:
+            r = np.random.uniform(0, 0.004)
+            ang = np.random.uniform(0, 2*np.pi)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+            z = np.random.uniform(0.030, 0.040)
     return x, y, z
 
 def collide():
@@ -332,11 +339,11 @@ def endPosition(extPos=0.12):
     #PARTICLE_NUMBER: total number of particles to simulate.
 
     #Important: need to properly retrieve geometry
-    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER, geometry
+    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER, geometry, INIT_MODE
 
     traj = []
     np.random.seed()
-    x, y, z = initial_species_position(.01, geometry)
+    x, y, z = initial_species_position(.01, geometry, INIT_MODE)
     vx, vy, vz = initial_species_velocity(T_s0=4)
     sim_time = 0.0 #Tracking simulation time
 
@@ -408,7 +415,7 @@ def showWalls():
         print("Failed: Did not recognize geometry")
         sys.exit()
 
-    plot_boundaries(endPoint=default_endPos)
+    #plot_boundaries(endPoint=default_endPos)
 
     #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
     inputs = np.ones(PARTICLE_NUMBER) * default_endPos
@@ -455,7 +462,9 @@ if __name__ == '__main__':
     parser.add_argument('--mult', type=float, dest='mult', action='store') # Specify cross section multiplier (optional)
     parser.add_argument('--npar', type=int, dest='npar', action='store') #Specify number of particles to simulate (optional, defaults to 1)
     parser.add_argument('--lite', dest='lite', action='store_true')
-    parser.set_defaults(lite=False, mult=5, npar=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
+
+    parser.add_argument('--init_mode',dest='init_mode', action='store')
+    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
     FF = args.one
@@ -464,8 +473,9 @@ if __name__ == '__main__':
     PARTICLE_NUMBER = args.npar
     crossMult = args.mult
     LITE_MODE = args.lite
+    INIT_MODE = args.init_mode
 
-    print("Particle number {0}, crossmult {1}, LITE_MODE is {2}".format(PARTICLE_NUMBER,crossMult,LITE_MODE))
+    print("Particle number {0}, crossmult {1}, LITE_MODE is {2}, INIT_MODE {3}".format(PARTICLE_NUMBER,crossMult,LITE_MODE, INIT_MODE))
 
     # =============================================================================
     # Constant Initialization

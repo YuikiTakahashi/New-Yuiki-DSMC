@@ -713,10 +713,18 @@ def analyzeWallData(file_ext, pos):
             180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))))
 
 ##########################******************************#########################################
+
+
+
+
+
+
+
+
 def fit_velocity_dist(vzs, vrs):
     (mu,sigma) = norm.fit(vzs)
     n, bins, patches = plt.hist(vzs,60,density=1,alpha=0.75)
-    y=mlab.normpdf(bins, mu, sigma)
+    y=st.norm.pdf(bins, mu, sigma)
     lab = 'Mean: {}\nSig: {}\nFWHM: {}'.format(round(mu,3), round(sigma,3), round(2.355*sigma,3))
     l = plt.plot(bins, y, 'r--', linewidth=2, label=lab)
     plt.title('Forward Velocity Distribution')
@@ -728,7 +736,7 @@ def fit_velocity_dist(vzs, vrs):
     
     (mu,sigma) = norm.fit(vrs)
     n, bins, patches = plt.hist(vrs,60,density=1,alpha=0.75)
-    y=mlab.normpdf(bins, mu, sigma)
+    y=st.norm.pdf(bins, mu, sigma)
     lab = 'Mean: {}\nSig: {}\nFWHM: {}'.format(round(mu,3), round(sigma,3), round(2.355*sigma,3))
     l = plt.plot(bins, y, 'r--', linewidth=2, label=lab)
     plt.title('Transverse Velocity Distribution')
@@ -756,11 +764,17 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     The default dome is set to radius r=0.02 m.
     '''
     print('The aperture is at z = 0.064 m.')
-
+    
+    #This should be set to 120 for F and G geometries, 240 for H geometry
+    DEFAULT_ENDPOS = 120 
+    #0.064 for f and g cell geometries, 0.06785 for h cell
+    DEFAULT_APERTURE = 0.064
+    
     #Coordinates of bowl center
     x_center=0
     y_center=0
-    z_center=64 #64 mm
+    
+    z_center=64 #64 mm for f/g, 67.85mm for h
 
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
@@ -769,7 +783,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     window_radius = 2.0 
 
     if rad_mode == False:
-        print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
+        print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-DEFAULT_APERTURE))
         dome_rad = pos - z_center
         print("dome_rad is equal to {0}".format(dome_rad))
 
@@ -789,8 +803,8 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     #f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
     #f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1) 
-    #f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
-    f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1) 
+    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
+    #f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1) 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
 #                'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
@@ -798,7 +812,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 #                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
                 'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
-                'h005_larg':5, 'h005_larg2':5, 'h005_cluster':5}[file_ext]
+                'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -816,11 +830,11 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
 
     print("Number of particles: {}".format(num))
-    #finals = np.zeros((num, 9))
-    finals = np.zeros((1,9))
+    finals = np.zeros((num, 9))
+    #finals = np.zeros((1,9))
     j = 0
     for i in range(len(f)):
-        if (not np.any(f[i])) and f[i-1][2] != 120 and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
+        if (not np.any(f[i])) and f[i-1][2] != DEFAULT_ENDPOS and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
             #Finds final row of data for adequate particles. Not condensed, but those that
             #went past aperture. Maybe condensed in vacuum chamber?
             x, y, z, vx, vy, vz, tim = f[i-1]
@@ -832,8 +846,8 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
             
-            finals = np.append(finals, np.array([x, y, z, vx, vy, vz, tim, r, theta]),axis=0)
-            #finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
+            #finals = np.append(finals, np.array([x, y, z, vx, vy, vz, tim, r, theta]),axis=0)
+            finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
             j += 1
 
     found = False
@@ -853,8 +867,8 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
                 print("Writing to debug file on j={}, file row {}, block {}".format(j, i-1, 'B'))
                 #debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
 
-            #finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
-            finals = np.append(finals, np.array([x, y, pos, vx, vy, vz, tim, r, theta]),axis=0)
+            finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
+            #finals = np.append(finals, np.array([x, y, pos, vx, vy, vz, tim, r, theta]),axis=0)
             
             j += 1
             found = True
@@ -905,7 +919,6 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         elif not np.any(f[i]):
             found = False
         
-    print("FINALS SIZE {}".format(finals.shape))
     if debug:
         print("Got to close")
         debugf.close()
@@ -945,12 +958,12 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     
     if window==True:
         #Restrict to particles with r <= 2.0
-        np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata1.dat', pdata)
+        #np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata1.dat', pdata)
         
         pdata = pdata[pdata[:,0]**2 + pdata[:,1]**2 <= window_radius**2]
         numAnalyzing = pdata.shape[0]
         
-        np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata2.dat', pdata)
+        #np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata2.dat', pdata)
         
     #xs, ys, zs come in mm, times come in mm/s, velocities come in m/s
     #Divide by a 1000 to convert
@@ -1076,7 +1089,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
 
     if rad_mode == False:
-        print('\nAnalysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-0.064))
+        print('\nAnalysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-DEFAULT_APERTURE))
 
     elif rad_mode == True:
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
@@ -1131,7 +1144,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
     #Important: specifying radius also specifies labels for plots
 def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False):
-    fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
+    fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
 
     if write==True:
         for f in fileList:
@@ -1161,8 +1174,9 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 # =============================================================================
 def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
-    fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
-    #fileList = ['g002','g005','g020','g050','g200']
+    #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
+    fileList = ['g002','g005','g010','g020','g050','g100','g200']
+    #fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
     
     if write==True:
         for f in fileList:
@@ -1270,6 +1284,8 @@ def series_multirate_plots(plane=0.064):
     
 #    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
 #                'DoubleCross/far_plane.dat']
+
+############################################################
         
 #    fileList = ['Window/plane94_halfcross.dat',\
 #                'Window/plane94_onecross.dat',\
@@ -1287,18 +1303,39 @@ def series_multirate_plots(plane=0.064):
 #                  fileList[1] : '--',\
 #                  fileList[2] :':'}
 
+############################################################
 
+#    fileList = ['TimeColumn/plane94_window.dat',\
+#                'BevelGeometry/plane94_window.dat']
+#    
+#    legends = {fileList[0] : 'Straight Hole',\
+#               fileList[1] : 'Beveled Aperture'}
+#    
+#    formats = {fileList[0] : 'go',\
+#               fileList[1] : 'ro'}
+#    
+#    linestyles = {fileList[0] : '--',\
+#                  fileList[1] : ':'}
+
+#############################################################
+    
     fileList = ['TimeColumn/plane94_window.dat',\
-                'BevelGeometry/plane94_window.dat']
+                'BevelGeometry/plane94_window.dat',\
+                'ClusterLaval/plane3cm_window.dat']
     
     legends = {fileList[0] : 'Straight Hole',\
-               fileList[1] : 'Beveled Aperture'}
+               fileList[1] : 'Beveled Aperture',\
+               fileList[2] : 'de Laval'}
     
     formats = {fileList[0] : 'go',\
-               fileList[1] : 'ro'}
+               fileList[1] : 'ro',\
+               fileList[2] : 'co'}
     
     linestyles = {fileList[0] : '--',\
-                  fileList[1] : ':'}
+                  fileList[1] : ':',\
+                  fileList[2] : ':'}
+
+
 
     
     
@@ -1321,7 +1358,7 @@ def series_multirate_plots(plane=0.064):
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (Small window at z={} mm)'.format(1000*plane)
+    title_note = '\n (Small window, 3 cm past aperture)'.format(1000*plane)
 
     plt.title("Extraction vs Flow rate")
     plt.xlabel("Flow [SCCM]")
@@ -1329,7 +1366,7 @@ def series_multirate_plots(plane=0.064):
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
     for file in fileList:
-        plt.errorbar(x=(fr_dic[file])[0:4], y=(ext_dic[file])[0:4], yerr=(sigE_dic[file])[0:4], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:5], y=(ext_dic[file])[0:5], yerr=(sigE_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1357,7 +1394,7 @@ def series_multirate_plots(plane=0.064):
     plt.clf()
     
     
-    plt.title("Transverse Velocity FWHM vs Reynolds Number"+'\n(At aperture)')
+    plt.title("Transverse Velocity FWHM vs Reynolds Number"+title_note)
     plt.xlabel("Reynolds Number (Re=3.44*flow)")
     plt.ylabel("Velocity FWHM [m/s]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
@@ -1368,12 +1405,12 @@ def series_multirate_plots(plane=0.064):
     plt.clf()
     
     
-    plt.title("Angular Spread vs Reynolds Number"+title_note)
-    plt.xlabel("Reynolds Number")
+    plt.title("Angular Spread vs Flow"+title_note)
+    plt.xlabel("Flow [SCCM]")
     plt.ylabel("Angular Spread [deg]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
     for file in fileList:
-        plt.errorbar(x=reyn_dic[file], y=spreadB_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:5], y=(spreadB_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
