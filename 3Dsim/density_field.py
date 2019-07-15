@@ -33,9 +33,9 @@ def main():
     plot_dens()
 
 def set_many():
-    flist = ['010','020','050','100','002']
+    flist = ['010','020','050','100','002','005']
     for f in flist:
-        set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
+        set_params(FF='G_Cell/DS2g{}.DAT'.format(f))
 
 def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
@@ -86,7 +86,7 @@ def set_field(FF):
 
         elif FF[10] in ['h']:
             print('H geometry grid'.format(FF[10]))
-            grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.    
+            grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
 
 
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
@@ -272,14 +272,26 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     title = {'mfp':'Mean Free Path', 'vz':'Forward Velocity', 'temp':'Temperature','dens':'Density'}[quantity]
 
     fig, ax = plt.subplots()
-    plt.title('Buffer Gas '+title)
+    plt.title('Buffer Gas '+title+'\nde Laval aperture')
 
     z_array = np.linspace(z0,zf,num=array_size)
     #plt.title("Mean Free Path in Buffer Gas \n Flowrate = {} SCCM".format(which_flow))
-    legends = {'f200' : 'Straight hole, 200 SCCM',\
-               'g200' : 'Bevel hole, 200 SCCM', \
-               'f005' : 'Straight hole, 5 SCCM',\
-               'g005' : 'Bevel hole, 5 SCCM'}
+#    legends = {'f200' : 'Straight hole, 200 SCCM',\
+#               'g200' : 'Bevel hole, 200 SCCM', \
+#               'f005' : 'Straight hole, 5 SCCM',\
+#               'g005' : 'Bevel hole, 5 SCCM',\
+#               'h200' : 'de Laval, 200 SCCM',\
+#               'h005' : 'de Laval, 5 SCCM'}
+    legends={}
+    for flow in flowList:
+        if flow not in legends:
+#            flowtype = {'f': 'Straight hole, ',\
+#                        'g': 'Bevel hole, ',\
+#                        'h': 'de Laval, '}[flow[0]]
+            flowtype=''
+            flowrate = str(int(flow[1:4]))+' SCCM'
+            legends.update( {flow : flowtype+flowrate})
+
     for f in flowList:
 
         quant_array = np.ones(array_size)
@@ -297,8 +309,209 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
 
     plt.xlabel('Z distance (m)')
     plt.legend()
-    plt.axvline(x=0.064)
+    #plt.axvline(x=0.064)
+    plt.axvline(x=0.098)
     plt.show()
+
+
+# =============================================================================
+# Measure on window
+# =============================================================================
+def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, plot=0):
+    '''
+    Returns statistics on vz, FWHM vz, angular spread, etc for a specified
+    BG flow field, on a small window of radius WINDOW_RAD about the z-axis.
+    '''
+    WINDOW_RAD=0.03
+    ARRAY_SIZE = 2000
+
+    logscale=0
+
+#    fileList = ['Fcell.dat', 'Gcell.dat', 'Hcell.dat']
+    fileList = ['Fcell_plane.dat', 'Gcell_plane.dat', 'Hcell_plane.dat']
+
+    legends = {fileList[0] : 'Straight Hole',\
+               fileList[1] : 'Beveled Aperture',\
+               fileList[2] : 'de Laval'}
+
+    formats = {fileList[0] : 'go',\
+               fileList[1] : 'ro',\
+               fileList[2] : 'co'}
+
+    linestyles = {fileList[0] : '--',\
+                  fileList[1] : ':',\
+                  fileList[2] : ':'}
+
+
+    fr_dic, ext_dic, sigE_dic, vr_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic = {},{},{},{},{},{},{},{}
+
+    if plot==1:
+        folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
+        f = np.loadtxt(folder + file, skiprows=1)
+
+        zs, frs, vz, vzSig, vR, vRSig, spreadB = f[:,0], f[:,1], f[:,2], \
+        f[:,3], f[:,4], f[:,5], f[:,6]
+
+        plt.title("Angular Spread vs Flow")
+        plt.errorbar(x=frs, y=spreadB, fmt='ro')
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Divergence [deg]")
+        plt.show()
+        plt.clf()
+
+        plt.title("Forward Velocity vs Flow")
+        plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='ro')
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Forward Velocity [m/s]")
+        plt.show()
+        plt.clf()
+
+        plt.title("Forward Velocity FWHM vs Flow")
+        plt.errorbar(x=frs, y=2.355*vzSig, fmt='ro')
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Forward Velocity FWHM [m/s]")
+        plt.show()
+        plt.clf()
+
+
+
+    elif plot==3:
+
+        for file in fileList:
+            folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
+            f = np.loadtxt(folder + file, skiprows=1)
+
+            zs, frs, vz, vzSig, vr, vRSig, spreadB = f[:,0], f[:,1], f[:,2], \
+            f[:,3], f[:,4], f[:,5], f[:,6]
+
+            fr_dic.update( {file : frs} )
+
+            vz_dic.update( {file : vz} )
+            vzSig_dic.update( {file : vzSig} )
+
+            vr_dic.update( {file : vr})
+            vrSig_dic.update( {file : vRSig})
+            spreadB_dic.update( {file : spreadB} )
+
+        plt.title("Forward Velocity vs Flow rate")
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Forward Velocity [m/s]")
+        # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
+        for file in fileList:
+            plt.errorbar(x=(fr_dic[file])[0:5], y=(vz_dic[file])[0:5], yerr=(vzSig_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.legend()
+        plt.show()
+        plt.clf()
+
+
+        plt.title("Forward Velocity FWHM vs Flow")
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Velocity FWHM [m/s]")
+        # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+        for file in fileList:
+            plt.errorbar(x=fr_dic[file], y=2.355*vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.legend()
+        plt.show()
+        plt.clf()
+
+        plt.title("Angular Spread vs Flow")
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Angular Spread [deg]")
+        # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+        for file in fileList:
+            plt.errorbar(x=(fr_dic[file])[0:5], y=(spreadB_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.legend()
+        plt.show()
+        plt.clf()
+
+    elif plot==0:
+
+        flowrate = int(which_flow[1:4])
+        print(flowrate)
+
+        global fvz, fvr
+        vz_field = fvz[which_flow]
+        vr_field = fvr[which_flow]
+
+        vzs = np.ones(ARRAY_SIZE)
+        vrs = np.ones(ARRAY_SIZE)
+
+        rs = np.sqrt( np.linspace(0, WINDOW_RAD**2, num=ARRAY_SIZE) )
+        angs = np.linspace(0, 2*np.pi, num=ARRAY_SIZE)
+
+        for i in range(ARRAY_SIZE):
+            # rs[i] = np.sqrt(np.random.uniform(0, WINDOW_RAD**2))
+            # angs[i] = np.random.uniform(0,2*np.pi)
+
+            vzs[i] = vz_field(z, rs[i])[0][0]
+            vrs[i] = vr_field(z, rs[i])[0][0]
+
+#        plt.scatter(rs*np.cos(angs), rs*np.sin(angs))
+#        plt.axis('equal')
+#        plt.show()
+        
+        plt.title('Vzs vs Radius')
+        plt.scatter(rs, vzs)
+        plt.show()
+        
+        plt.title('Vrs vs Radius')
+        plt.scatter(rs, vrs)
+        plt.show()
+        
+        RV, THET = np.meshgrid(rs, angs)
+        VZS = np.ones(RV.shape)
+        VRS = np.ones(RV.shape)
+
+        for i in range(ARRAY_SIZE):
+            for j in range(ARRAY_SIZE):
+                r = RV[i,j]
+                VZS[i,j] = vz_field(z, r)[0][0]
+                VRS[i,j] = vr_field(z, r)[0][0]
+
+        #print(dens)
+        if logscale:
+            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS, norm=colors.LogNorm(vmin=VZS.min(),vmax=VZS.max() ) )
+            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS, norm=colors.LogNorm(vmin=VRS.min(),vmax=VRS.max() ) )
+        else:
+            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS)
+            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS)
+
+        plt.axis('equal')
+        plt.show()
+
+        # fig, ax = plt.subplots(subplot_kw=dict(projection='polar'))
+        # azm = np.linspace(0,2*np.pi)
+        #
+        # r,th = np.meshgrid(rs,azm)
+        # vplot = np.tile(vzs, (r.shape[0],1))
+        #
+        # plt.pcolormesh(th, r, vplot, norm=colors.LogNorm(vzs.min(), vzs.max()))
+        # plt.axis('equal')
+        # plt.show()
+
+        print('Radial velocity: %.1f +- %.1f m/s'\
+              %(np.mean(vrs), np.std(vrs)))
+        print('Axial velocity: %.1f +- %.1f m/s'\
+              %(np.mean(vzs), np.std(vzs)))
+
+        spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
+        print('Angular spread: %.1f deg'%(spreadB))
+
+        if write == 1:
+            with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/{}'.format(file), 'a') as tc:
+                tc.write('  '.join(map(str, [z, flowrate, round(np.mean(vzs),3), round(np.std(vzs),3), round(np.mean(vrs),3),\
+                         round(np.std(vrs),3), round(spreadB,3)] ))+'\n')
+
+            tc.close()
+
+
+
+
+
+
+
+
+
 
 # =============================================================================
 # Collision number calculations (probably useless)
