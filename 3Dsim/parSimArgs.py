@@ -293,7 +293,13 @@ def initial_species_position(L=0.01, form='', mode=0):
             ang = np.random.uniform(0, 2*np.pi)
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.035, 0.045)
-            
+
+        elif mode==9:
+            r = np.random.uniform(0,0.00635)
+            ang = np.random.uniform(0, 2*np.pi)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+            z = np.random.uniform(0.015,0.0635)
+
     return x, y, z
 
 def collide():
@@ -337,11 +343,10 @@ def endPosition(extPos=0.12):
     '''
 
     #LITE_MODE: if true, only write data to file once at the beginning, and when past the aperture.
-    #particle_count: tracks how many particles have been simulated so far
     #PARTICLE_NUMBER: total number of particles to simulate.
 
     #Important: need to properly retrieve geometry
-    global vx, vy, vz, LITE_MODE, particle_count, PARTICLE_NUMBER, geometry, INIT_MODE
+    global vx, vy, vz, LITE_MODE, geometry, INIT_MODE, PROBE_MODE
 
     print("Running, INIT = {}".format(INIT_MODE))
 
@@ -364,7 +369,7 @@ def endPosition(extPos=0.12):
 
             #Print the full trajectory ONLY if 1) LITE_MODE=False, so we want all data,
             #or if 2) we are close enough to the aperture that we want to track regardless
-            if LITE_MODE == False or z > 0.062:
+            if (LITE_MODE == False or z > 0.062) and PROBE_MODE == False:
                     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                                 round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
 
@@ -386,9 +391,6 @@ def endPosition(extPos=0.12):
                                    round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time,4) ] ) )+'\n')
     traj.append(' '.join(map(str, [0,0,0,0,0,0,0]))+'\n') #Added an extra zero
 
-    #particle_count += 1
-    #print("Running: {0}% complete".format(100*float(particle_count/PARTICLE_NUMBER)))
-
     return traj
 
 
@@ -407,7 +409,7 @@ def showWalls():
 
     f = open(outfile, "w+")
 
-    global geometry, INIT_MODE
+    global geometry, INIT_MODE, PROBE_MODE
 
     if geometry == 'hCell':
         default_endPos = 0.24
@@ -466,7 +468,8 @@ if __name__ == '__main__':
     parser.add_argument('--lite', dest='lite', action='store_true')
 
     parser.add_argument('--init_mode', type=int, dest='init_mode', action='store')
-    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
+    parser.add_argument('--probe_mode', dest='probe_mode', action='store_true')
+    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
     FF = args.one
@@ -476,9 +479,10 @@ if __name__ == '__main__':
     crossMult = args.mult
     LITE_MODE = args.lite
     INIT_MODE = args.init_mode
+    PROBE_MODE = args.probe_mode
 
     print("Particle number {0}, crossmult {1}, LITE_MODE is {2}, INIT_MODE {3}".format(PARTICLE_NUMBER,crossMult,LITE_MODE, INIT_MODE))
-
+    print("PROBE_MODE is {}".format(PROBE_MODE))
     # =============================================================================
     # Constant Initialization
     # =============================================================================
@@ -497,8 +501,6 @@ if __name__ == '__main__':
 
     # Global variable initialization: these values are irrelevant
     vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
-
-    particle_count=0
 
     set_derived_quants()
 
