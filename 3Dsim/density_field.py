@@ -546,7 +546,27 @@ def plot_ncoll(numpoints=100, which_flow='f005'):
     plt.show()
 
 
+# =============================================================================
+# Outputting final forward velocities for every flow into a DAT file
+# =============================================================================
 
+def write_final_vz(write=0):
+    folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
+    file = folder+'finalCenterLineVzs.dat'
+    
+    if write == 1:
+            with open(file, 'a') as tc:
+                tc.write('Fr    F     G     H\n')
+                for flowrate in ['002', '005', '010', '020', '050', '100', '200']:
+                    
+                        vzF = get_vz(0, 0, 0.25, 'f'+flowrate)
+                        vzG = get_vz(0, 0, 0.25, 'g'+flowrate)
+                        vzH = get_vz(0, 0, 0.25, 'h'+flowrate)
+                        
+                        tc.write('  '.join(map(str, [flowrate, round(vzF,3), round(vzG,3), round(vzH,3)] ))+'\n')
+
+            tc.close()
+    
 
 
 #if __name__ == '__main__':

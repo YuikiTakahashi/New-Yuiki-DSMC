@@ -40,6 +40,22 @@ cross *= 5 # Manual
 # Global variable initialization: these values are irrelevant
 vx, vy, vz, xFlow, yFlow, zFlow = 0, 0, 0, 0, 0, 0
 
+
+finalVzDic = {}
+
+def set_final_vzs():
+    file='/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/finalCenterLineVzs.dat'
+    f = np.loadtxt(file, skiprows=1)
+
+    print(f[:,0])
+    print(f.shape)
+    flowrates = ['002','005','010','020','050','100','200']
+    for i in range(f.shape[0]):
+        vzF, vzG, vzH = f[i,1], f[i,2], f[i,3]
+        fr = flowrates[i]
+        finalVzDic.update( {'f'+fr:vzF, 'g'+fr:vzG, 'h'+fr:vzH } )
+
+
 def set_derived_quants():
     '''
     This function must be run whenever n, T, T_s, vx, vy, or vz are changed.
@@ -731,9 +747,9 @@ def fit_velocity_dist(vzs, vrs):
     plt.xlabel('Forward Velocity [m/s]')
     plt.ylabel('Frequency')
     plt.legend()
-    plt.show()
+#    plt.show()
     plt.clf()
-    
+
     (mu,sigma) = norm.fit(vrs)
     n, bins, patches = plt.hist(vrs,60,density=1,alpha=0.75)
     y=st.norm.pdf(bins, mu, sigma)
@@ -743,14 +759,16 @@ def fit_velocity_dist(vzs, vrs):
     plt.xlabel('Transverse Velocity [m/s]')
     plt.ylabel('Frequency')
     plt.legend()
-    plt.show()
+#    plt.show()
     plt.clf()
-    
 
 
 
+MEDIAN_APERTURE_RADII = {'g200' : 1.135,\
+                         'f21':1.397, 'f22':1.021, 'f23':1.212, 'f20':1.148, 'f19':0.819, 'f18':0.976,\
+                         'h002':1.271, 'h010':1.123, 'h020':0.976,'h050':0.791,'h100':0.938,'h200':1.158}
 
-def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
+def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -765,22 +783,32 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     '''
     print('The aperture is at z = 0.064 m.')
     
+#    PREV_AP_RAD = 1.167
+    
+    try:
+        PREV_AP_RAD = MEDIAN_APERTURE_RADII[file_ext] #mm
+    
+    except:
+        PREV_AP_RAD = 0.0
+    
     #This should be set to 120 for F and G geometries, 240 for H geometry
-    DEFAULT_ENDPOS = 120 
+    DEFAULT_ENDPOS = 240
+    
     #0.064 for f and g cell geometries, 0.06785 for h cell
-    DEFAULT_APERTURE = 0.064
-    
-    #Coordinates of bowl center
+    DEFAULT_APERTURE = 0.06785
+
+    #64 mm for f/g, 67.85mm for h
+    z_center=67.85
     x_center=0
-    y_center=0
+    y_center=0  #Coordinates of bowl center
+
     
-    z_center=64 #64 mm for f/g, 67.85mm for h
 
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
-    
+
     #Radius (mm) of the window for particle measurements. Only used if window=True
-    window_radius = 2.0 
+    window_radius = 2.0
 
     if rad_mode == False:
         print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-DEFAULT_APERTURE))
@@ -798,13 +826,20 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
     
-    #f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
-    #f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
-    #f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
-    #f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
-    #f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1) 
-    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1) 
-    #f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1) 
+    folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
+              'BevelGeometry':'BevelGeometry/{}.dat',\
+              'ClusterLaval':'ClusterLaval/{}.dat'}
+    
+#    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
+#    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
+#    f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
+#    f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1)
+#    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
+#    f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1)
+#    f = np.loadtxt(directory + 'InitLarge/{}_init1.dat'.format(file_ext), skiprows=1)
+    
+    f = np.loadtxt(directory+ (folder_sw[folder]).format(file_ext), skiprows=1)
+
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
 #                'flow_19_a':50,'flow_20':10,'flow_21':2,'flow_22':100,\
@@ -812,7 +847,8 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 #                'f20_lite':10, 'f21_lite':2, 'f22_lite':100, 'f23_lite':200}[file_ext]
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
                 'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
-                'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200}[file_ext]
+                'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200,\
+                'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -845,7 +881,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r)
-            
+
             #finals = np.append(finals, np.array([x, y, z, vx, vy, vz, tim, r, theta]),axis=0)
             finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
             j += 1
@@ -869,7 +905,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
             finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
             #finals = np.append(finals, np.array([x, y, pos, vx, vy, vz, tim, r, theta]),axis=0)
-            
+
             j += 1
             found = True
 
@@ -918,7 +954,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
         elif not np.any(f[i]):
             found = False
-        
+
     if debug:
         print("Got to close")
         debugf.close()
@@ -939,6 +975,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
         plt.xlim(0, pos0+0.01)
         plt.show()
+        plt.clf()
 
     #If analyzing an XY plane at z=pos
     if rad_mode == False:
@@ -955,16 +992,16 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
 
 #    Add the possibility of restricting "final" particles to those in a small window
-    
+
     if window==True:
         #Restrict to particles with r <= 2.0
         #np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata1.dat', pdata)
-        
+
         pdata = pdata[pdata[:,0]**2 + pdata[:,1]**2 <= window_radius**2]
         numAnalyzing = pdata.shape[0]
-        
+
         #np.savetxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/AD/pdata2.dat', pdata)
-        
+
     #xs, ys, zs come in mm, times come in mm/s, velocities come in m/s
     #Divide by a 1000 to convert
     xs, ys, zs, vxs, vys, vzs, times, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
@@ -983,9 +1020,9 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
     median_radius = np.median(rs) #radius of cylinder containing 50% of the particles
     median_theta = np.median(thetas)
     print('Median radius {0} mm, median theta {1} deg'.format(round(1000*median_radius,3), round(median_theta,3)) )
-    
+
     fit_velocity_dist(vzs, vrs)
-    
+
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
     if rad_mode == True:
         dep_title = " at r = {0} m".format(dome_rad0)
@@ -1000,24 +1037,26 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
         plt.plot(100*xs, 100*ys, '.', zorder=1)
         circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, \
                           zorder=2, label='Beam median radius: {} mm'.format(round(1000*median_radius,3)))
-        circ2 = plt.Circle((0,0), 0.0819, color='purple', fill=0, lw=2, \
-                          zorder=2, label='Beam at aperture: {} mm'.format(round(0.819,3)))
+        circ2 = plt.Circle((0,0), PREV_AP_RAD/10, color='purple', fill=0, lw=2, \
+                          zorder=2, label='Beam at aperture: {} mm'.format(round(PREV_AP_RAD,3)))
         ax.add_patch(circ)
         ax.add_patch(circ2)
-        plt.xlim(-1,1)
-        plt.ylim(-1,1)
+        plt.xlim(-3.5,3.5)
+        plt.ylim(-2.5,2.5)
         plt.xlabel('x (cm)')
         plt.ylabel('y (cm)')
-        plt.title("Radial scatter," + dep_title_flow)
+        plt.title("Radial scatter" + dep_title_flow)
         plt.legend()
+        #plt.annotate('Grew {}%'.format( round(100*(1000*median_radius-PREV_AP_RAD)/PREV_AP_RAD, 1)) ,(-2.5,-1.5))
         #plt.add_artist()
         #plt.title("Radial Positions at r = %g m"%dome_rad)
-        plt.tight_layout()
+        #plt.tight_layout()
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/radial_scatter.png")
         plt.show()
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
-
+        
+        
 
 #        plt.title("Radial Distribution" + dep_title_flow)
 #        #plt.title("Radial Distribution at r = %g m"%dome_rad)
@@ -1096,10 +1135,10 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
 
     print('%d/%d (%.1f%%) made it to z = %g m.'%(numArrived, num, 100*float(numArrived)/num, pos0))
     print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
-    
+
     if window:
         print('Of these, {} fit in window of radius {} mm'.format(numAnalyzing,window_radius))
-    
+
     print('Radial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
           %(np.mean(vrs), np.std(vrs)))
     print('Axial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
@@ -1137,7 +1176,7 @@ def analyzeTrajData(file_ext, write_file=None, pos=0.064, write=False, plots=Fal
             tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
-                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3)] ))+'\n')
+                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3), round(1000*median_radius,3)] ))+'\n')
 
         tc.close()
 
@@ -1175,12 +1214,14 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
-    fileList = ['g002','g005','g010','g020','g050','g100','g200']
-    #fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
+#    fileList = ['g002','g005','g010','g020','g050','g100','g200']
+    fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
+
+    folder = 'ClusterLaval'
     
     if write==True:
         for f in fileList:
-            analyzeTrajData(f, file, pos=plane, write=True, rad_mode=False)
+            analyzeTrajData(f, folder, file, pos=plane, write=True, rad_mode=False)
 
     if plot == True:
 
@@ -1188,9 +1229,9 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
         f = np.loadtxt(folder+file, skiprows=1)
 
         zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
-        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+        thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
         f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
-        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15], f[:,16]
 
         print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
@@ -1273,79 +1314,87 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
 # =============================================================================
 def series_multirate_plots(plane=0.064):
 
-    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic = {},{},{},{},{},{},{},{}
+    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic, medRad_dic = {},{},{},{},{},{},{},{},{}
 
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
-#    fileList = ['HalfCross/plane_compar.dat',\
+#    seriesList = ['HalfCross/plane_compar.dat',\
 #                'TimeColumn/comp_plane.dat',\
 #                'DoubleCross/aperture_compare.dat']
-    
-    
-#    fileList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
+
+
+#    seriesList = ['HalfCross/far_plane.dat', 'TimeColumn/far_plane.dat',\
 #                'DoubleCross/far_plane.dat']
 
 ############################################################
-        
-#    fileList = ['Window/plane94_halfcross.dat',\
+
+#    seriesList = ['Window/plane94_halfcross.dat',\
 #                'Window/plane94_onecross.dat',\
 #                'Window/plane94_doublecross.dat']
 #
-#    legends = {fileList[0] : '0.5 Sigma',\
-#               fileList[1] : 'Sigma',\
-#               fileList[2] : '2 Sigma'}
-#    
-#    formats = {fileList[0] : 'ro',\
-#               fileList[1] : 'bo',\
-#               fileList[2] : 'go'}
-#    
-#    linestyles = {fileList[0] : ':',\
-#                  fileList[1] : '--',\
-#                  fileList[2] :':'}
+#    legends = {seriesList[0] : '0.5 Sigma',\
+#               seriesList[1] : 'Sigma',\
+#               seriesList[2] : '2 Sigma'}
+#
+#    formats = {seriesList[0] : 'ro',\
+#               seriesList[1] : 'bo',\
+#               seriesList[2] : 'go'}
+#
+#    linestyles = {seriesList[0] : ':',\
+#                  seriesList[1] : '--',\
+#                  seriesList[2] :':'}
 
 ############################################################
 
-#    fileList = ['TimeColumn/plane94_window.dat',\
+#    seriesList = ['TimeColumn/plane94_window.dat',\
 #                'BevelGeometry/plane94_window.dat']
-#    
-#    legends = {fileList[0] : 'Straight Hole',\
-#               fileList[1] : 'Beveled Aperture'}
-#    
-#    formats = {fileList[0] : 'go',\
-#               fileList[1] : 'ro'}
-#    
-#    linestyles = {fileList[0] : '--',\
-#                  fileList[1] : ':'}
+#
+#    legends = {seriesList[0] : 'Straight Hole',\
+#               seriesList[1] : 'Beveled Aperture'}
+#
+#    formats = {seriesList[0] : 'go',\
+#               seriesList[1] : 'ro'}
+#
+#    linestyles = {seriesList[0] : '--',\
+#                  seriesList[1] : ':'}
 
 #############################################################
-    
-    fileList = ['TimeColumn/plane94_window.dat',\
-                'BevelGeometry/plane94_window.dat',\
-                'ClusterLaval/plane3cm_window.dat']
-    
-    legends = {fileList[0] : 'Straight Hole',\
-               fileList[1] : 'Beveled Aperture',\
-               fileList[2] : 'de Laval'}
-    
-    formats = {fileList[0] : 'go',\
-               fileList[1] : 'ro',\
-               fileList[2] : 'co'}
-    
-    linestyles = {fileList[0] : '--',\
-                  fileList[1] : ':',\
-                  fileList[2] : ':'}
+
+    seriesList = ['TimeColumn/plane94_mr.dat',\
+                'BevelGeometry/plane94_mr.dat',\
+                'ClusterLaval/plane3cm_mr.dat']
+
+    legends = {seriesList[0] : 'Straight Hole',\
+               seriesList[1] : 'Beveled Aperture',\
+               seriesList[2] : 'de Laval'}
+
+    formats = {seriesList[0] : 'go',\
+               seriesList[1] : 'ro',\
+               seriesList[2] : 'co'}
+
+    linestyles = {seriesList[0] : '--',\
+                  seriesList[1] : ':',\
+                  seriesList[2] : ':'}
+
+#    seriesList = ['TimeColumn/far_plane.dat',\
+#                  'InitLarge/plane94.dat']
+#
+#    legends = {seriesList[0] : 'Standard',\
+#               seriesList[1] : 'Wide'}
+#
+#    formats = {seriesList[0] : 'ro',\
+#               seriesList[1] : 'co'}
+#
+#    linestyles = {seriesList[0] : '--',\
+#                  seriesList[1] : ':'}
 
 
-
-    
-    
-    for file in fileList:
+    for file in seriesList:
         f = np.loadtxt(folder+file, skiprows=1)
-
         zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
-        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+        thetas, thetaSig, times, timeSig, reyn, spreadB, mRad = f[:,0], f[:,1], f[:,2], \
         f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
-        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15], f[:,16]
 
         fr_dic.update( {file : frs} )
         ext_dic.update( {file : ext} )
@@ -1355,18 +1404,21 @@ def series_multirate_plots(plane=0.064):
         vzSig_dic.update( {file : vzSig} )
         vrSig_dic.update( {file : vRSig})
         spreadB_dic.update( {file : spreadB} )
+        medRad_dic.update( {file : mRad} )
+
+
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (Small window, 3 cm past aperture)'.format(1000*plane)
+    title_note = '\n (3 cm past aperture)'.format(1000*plane)
 
-    plt.title("Extraction vs Flow rate")
+    plt.title("Extraction vs Flow rate"+title_note)
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-    for file in fileList:
-        plt.errorbar(x=(fr_dic[file])[0:5], y=(ext_dic[file])[0:5], yerr=(sigE_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    for file in seriesList:
+        plt.errorbar(x=(fr_dic[file])[0:8], y=(ext_dic[file])[0:8], yerr=(sigE_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1376,8 +1428,8 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    for file in fileList:
-        plt.errorbar(x=(fr_dic[file])[0:5], y=(vz_dic[file])[0:5], yerr=(vzSig_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    for file in seriesList:
+        plt.errorbar(x=(fr_dic[file])[0:8], y=(vz_dic[file])[0:8], yerr=(vzSig_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1387,35 +1439,118 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Velocity FWHM [m/s]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-    for file in fileList:
+    for file in seriesList:
         plt.errorbar(x=fr_dic[file], y=2.355*vzSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
-    
-    
+
+
     plt.title("Transverse Velocity FWHM vs Reynolds Number"+title_note)
     plt.xlabel("Reynolds Number (Re=3.44*flow)")
     plt.ylabel("Velocity FWHM [m/s]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-    for file in fileList:
+    for file in seriesList:
         plt.errorbar(x=reyn_dic[file], y=2.355*vrSig_dic[file], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
-    
-    
+
+
     plt.title("Angular Spread vs Flow"+title_note)
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Angular Spread [deg]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-    for file in fileList:
+    for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:5], y=(spreadB_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
-    
-    
+
+    plt.title("Beam Spread vs Flow"+title_note)
+    plt.xlabel("Flow [SCCM]")
+    plt.ylabel("Median Beam Radius [mm]")
+    # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    for file in seriesList:
+        plt.errorbar(x=(fr_dic[file])[0:8], y=(medRad_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+
+
+
+
+
+
+
+
+def series_vz_plots():
+    '''
+    Plots final forward velocities for both molecules and BG flows
+    '''
+    fr_dic, vz_dic, vzSig_dic = {}, {}, {}
+    folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+
+
+    seriesList = ['TimeColumn/plane94_window.dat',\
+                'BevelGeometry/plane94_window.dat',\
+                'ClusterLaval/plane3cm_window.dat',\
+                'fBG', 'gBG', 'hBG']
+
+    legends = {seriesList[0] : 'Straight Hole',\
+               seriesList[1] : 'Beveled Aperture',\
+               seriesList[2] : 'de Laval',\
+               seriesList[3] : 'Straight Hole BG',\
+               seriesList[4] : 'Beveled Aperture BG',\
+               seriesList[5] : 'de Laval BG'}
+
+    # formats = {seriesList[0] : 'go',\
+    #            seriesList[1] : 'ro',\
+    #            seriesList[2] : 'co'}
+    #
+    linestyles = { seriesList[0] : '--',\
+                   seriesList[1] : '--',\
+                   seriesList[2] : '--',\
+                   seriesList[3] : '-',\
+                   seriesList[4] : '-',\
+                   seriesList[5] : '-'}
+
+    for file in seriesList:
+        if file in ['fBG', 'gBG', 'hBG']:
+            f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/3cmCenterLineVzs.dat', skiprows=1)
+            frs = f[:,0]
+            col = {'f':1, 'g':2, 'h':3}[file[0]]
+            vzs = f[:,col]
+            vzSigs = np.array([0,0,0,0,0,0,0])
+            fr_dic.update( {file : frs} )
+            vz_dic.update( {file : vzs} )
+            vzSig_dic.update( {file : vzSigs} )
+
+
+        else:
+            f = np.loadtxt(folder+file, skiprows=1)
+            zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+            thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
+            f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+            f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
+
+            fr_dic.update( {file : frs} )
+            vz_dic.update( {file : vz} )
+            vzSig_dic.update( {file : vzSig} )
+
+
+
+    plt.title("Forward Velocity vs Flow\nDashed = molecules, solid = buffer gas")
+    plt.xlabel("Flow [SCCM]")
+    plt.ylabel("Velocity FWHM [m/s]")
+    plt.annotate('BG velocity measured 3cm past nozzle (post-expansion)',(0,235))
+    # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    for file in seriesList:
+        plt.errorbar(x=fr_dic[file], y=(vz_dic[file]), yerr=(vzSig_dic[file]), label=legends[file], ls=linestyles[file])
+    plt.legend()
+    plt.show()
+    plt.clf()
+
 
 #import cProfile
 #cProfile.run("endPosition(form='currentCell')")
