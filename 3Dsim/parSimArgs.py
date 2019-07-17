@@ -65,7 +65,7 @@ def get_flow_chars(filename):
 
     #e.g. filename = flows/G_Cell/DS2g020
     elif filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[16]]
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
     print(geometry)
@@ -161,6 +161,15 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in4 = r < z-0.0615 and z > 0.0640 and z < 0.06785
+        in5 = r < 0.030 and z >= 0.06785 and z < endPos #Remember to extend endPos!
+        inside = in1 + in2 + in3 + in4 + in5
+
+    elif form == 'jCell':
+        r = np.sqrt(x**2+y**2)
+        in1 = r < 0.00635 and z > 0.015 and z < 0.05965
+        in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
+        in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in4 = r < (3.85/7.9)*(z-0.064)+0.0025 and z > 0.0640 and z < 0.0719
         in5 = r < 0.030 and z >= 0.06785 and z < endPos #Remember to extend endPos!
         inside = in1 + in2 + in3 + in4 + in5
 
@@ -532,7 +541,7 @@ if __name__ == '__main__':
 
         if geometry == 'fCell' or geometry == 'gCell':
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
-        elif geometry == 'hCell':
+        elif geometry == 'hCell' or geometry == 'jCell':
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
         else:
             print('No geometry')
