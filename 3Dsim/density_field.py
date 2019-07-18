@@ -4,6 +4,8 @@ import argparse
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import ticker
+from scipy.optimize import minimize_scalar
+from functools import partial
 
 # =============================================================================
 # Always call main() first so that the quantity dictionaries get created
@@ -259,9 +261,73 @@ def plot_density_field(rmax=0.01, z1=0.010, z2=0.15, array_size=50, which_flow='
     plt.show()
 
 # =============================================================================
+# Get FWHM, or half-radius, in which half of the buffer gas is contained
+# =============================================================================
+
+def halfRadius(z, which_flow='h002', plot=False, pr=False):
+
+    ARRAY_SIZE = 1000
+    MAX_RAD = 0.03
+
+    
+    global fdens
+    dens_field = fdens[which_flow]
+
+    ds =  np.ones(ARRAY_SIZE)
+    rs = np.sqrt( np.linspace(0, MAX_RAD**2, num=ARRAY_SIZE) )
+
+    for i in range(ARRAY_SIZE):
+        ds[i] = np.exp(dens_field(z, rs[i])[0][0])
+
+
+    total_integral = integrate_cross_section(z, 0, MAX_RAD, which_flow)
+
+    toMinPartial = partial(toMinimize, z=z, r1=0, which_flow=which_flow, targ=total_integral)
+    res = minimize_scalar(toMinPartial, bounds=(0, 0.03), method='bounded')
+
+    rHalf = res.x
+    halfInt = integrate_cross_section(z, 0, rHalf, which_flow)
+
+    if pr:
+        print("Half-radius {}, integrates to {}".format(1000*rHalf, round(halfInt/total_integral,3)))
+
+    if plot:
+        plt.title('Radial Cross Section\n(z = {} mm)'.format(1000*z))
+        plt.plot(1000*rs, ds)
+        plt.xlabel('Radius [mm]')
+        plt.ylabel(r'Number Density [$m^{-3}$]')
+        plt.vlines(x=1000*rHalf, ymin=0, ymax=ds.max(), colors='r',label=r'$R_{1/2} =$'+' {} mm'.format(round(1000*rHalf,3)))
+        plt.legend()
+        plt.show()    
+        
+    return rHalf
+
+def toMinimize(x, z, r1, which_flow, targ):
+    return abs(0.5-(integrate_cross_section(z=z, r1=r1, r2=x, which_flow=which_flow) / targ))
+
+
+def integrate_cross_section(z, r1, r2, which_flow):
+    ARRAY_SIZE=1000
+    global fdens
+    dens_field = fdens[which_flow]
+
+    rs = np.sqrt( np.linspace(r1**2, r2**2, num=ARRAY_SIZE) )
+    ds =  np.ones(ARRAY_SIZE)
+
+    for i in range(ARRAY_SIZE):
+        ds[i] = np.exp(dens_field(z, rs[i])[0][0])
+
+    return np.trapz(y=ds*rs, x=rs)
+
+############################################################################################################
+############################################################################################################
+    
+
+# =============================================================================
 # Multi-field plotting functions, for comparing different geometries/flowrates
 # at the aperture
 # =============================================================================
+
 def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.15, logscale=True):
 
     global get_quantity_dic
@@ -343,14 +409,14 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
                   fileList[2] : ':'}
 
 
-    fr_dic, ext_dic, sigE_dic, vr_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic = {},{},{},{},{},{},{},{}
+    fr_dic, ext_dic, sigE_dic, vr_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic,rhalf_dic = {},{},{},{},{},{},{},{},{}
 
     if plot==1:
         folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
         f = np.loadtxt(folder + file, skiprows=1)
 
-        zs, frs, vz, vzSig, vR, vRSig, spreadB = f[:,0], f[:,1], f[:,2], \
-        f[:,3], f[:,4], f[:,5], f[:,6]
+        zs, frs, vz, vzSig, vR, vRSig, spreadB, rHalf = f[:,0], f[:,1], f[:,2], \
+        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7]
 
         plt.title("Angular Spread vs Flow")
         plt.errorbar(x=frs, y=spreadB, fmt='ro')
@@ -372,6 +438,13 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.ylabel("Forward Velocity FWHM [m/s]")
         plt.show()
         plt.clf()
+        
+        plt.title("Gas FWHM vs Flow")
+        plt.errorbar(x=frs, y=rHalf, fmt='ro')
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Half Radius [mm]")
+        plt.show()
+        plt.clf()
 
 
 
@@ -381,8 +454,8 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
             folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
             f = np.loadtxt(folder + file, skiprows=1)
 
-            zs, frs, vz, vzSig, vr, vRSig, spreadB = f[:,0], f[:,1], f[:,2], \
-            f[:,3], f[:,4], f[:,5], f[:,6]
+            zs, frs, vz, vzSig, vr, vRSig, spreadB, rHalf = f[:,0], f[:,1], f[:,2], \
+            f[:,3], f[:,4], f[:,5], f[:,6], f[:,7]
 
             fr_dic.update( {file : frs} )
 
@@ -392,6 +465,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
             vr_dic.update( {file : vr})
             vrSig_dic.update( {file : vRSig})
             spreadB_dic.update( {file : spreadB} )
+            rhalf_dic.update( {file : rHalf} )
 
         plt.title("Forward Velocity vs Flow rate")
         plt.xlabel("Flow [SCCM]")
@@ -423,6 +497,16 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.legend()
         plt.show()
         plt.clf()
+        
+        plt.title("Density FWHM vs Flow")
+        plt.xlabel("Flow [SCCM]")
+        plt.ylabel("Half Radius [mm]")
+        # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+        for file in fileList:
+            plt.errorbar(x=(fr_dic[file])[0:5], y=(rhalf_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.legend()
+        plt.show()
+        plt.clf()
 
     elif plot==0:
 
@@ -437,7 +521,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         vrs = np.ones(ARRAY_SIZE)
 
         rs = np.sqrt( np.linspace(0, WINDOW_RAD**2, num=ARRAY_SIZE) )
-        angs = np.linspace(0, 2*np.pi, num=ARRAY_SIZE)
+#        angs = np.linspace(0, 2*np.pi, num=ARRAY_SIZE)
 
         for i in range(ARRAY_SIZE):
             # rs[i] = np.sqrt(np.random.uniform(0, WINDOW_RAD**2))
@@ -449,58 +533,55 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
 #        plt.scatter(rs*np.cos(angs), rs*np.sin(angs))
 #        plt.axis('equal')
 #        plt.show()
-        
+
         plt.title('Vzs vs Radius')
         plt.scatter(rs, vzs)
         plt.show()
-        
+
         plt.title('Vrs vs Radius')
         plt.scatter(rs, vrs)
         plt.show()
+
+#Make a polar plot of the velocity field
         
-        RV, THET = np.meshgrid(rs, angs)
-        VZS = np.ones(RV.shape)
-        VRS = np.ones(RV.shape)
+#        RV, THET = np.meshgrid(rs, angs)
+#        VZS = np.ones(RV.shape)
+#        VRS = np.ones(RV.shape)
+#
+#        for i in range(ARRAY_SIZE):
+#            for j in range(ARRAY_SIZE):
+#                r = RV[i,j]
+#                VZS[i,j] = vz_field(z, r)[0][0]
+#                VRS[i,j] = vr_field(z, r)[0][0]
+#
+#        #print(dens)
+#        if logscale:
+#            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS, norm=colors.LogNorm(vmin=VZS.min(),vmax=VZS.max() ) )
+#            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS, norm=colors.LogNorm(vmin=VRS.min(),vmax=VRS.max() ) )
+#        else:
+#            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS)
+#            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS)
+#
+#        plt.axis('equal')
+#        plt.show()
 
-        for i in range(ARRAY_SIZE):
-            for j in range(ARRAY_SIZE):
-                r = RV[i,j]
-                VZS[i,j] = vz_field(z, r)[0][0]
-                VRS[i,j] = vr_field(z, r)[0][0]
 
-        #print(dens)
-        if logscale:
-            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS, norm=colors.LogNorm(vmin=VZS.min(),vmax=VZS.max() ) )
-            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS, norm=colors.LogNorm(vmin=VRS.min(),vmax=VRS.max() ) )
-        else:
-            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VZS)
-            plt.pcolormesh(RV*np.cos(THET), RV*np.sin(THET), VRS)
-
-        plt.axis('equal')
-        plt.show()
-
-        # fig, ax = plt.subplots(subplot_kw=dict(projection='polar'))
-        # azm = np.linspace(0,2*np.pi)
-        #
-        # r,th = np.meshgrid(rs,azm)
-        # vplot = np.tile(vzs, (r.shape[0],1))
-        #
-        # plt.pcolormesh(th, r, vplot, norm=colors.LogNorm(vzs.min(), vzs.max()))
-        # plt.axis('equal')
-        # plt.show()
-
-        print('Radial velocity: %.1f +- %.1f m/s'\
-              %(np.mean(vrs), np.std(vrs)))
-        print('Axial velocity: %.1f +- %.1f m/s'\
-              %(np.mean(vzs), np.std(vzs)))
+        print('Radial velocity: %.1f +- %.1f m/s' %(np.mean(vrs), np.std(vrs)))
+        print('Axial velocity: %.1f +- %.1f m/s' %(np.mean(vzs), np.std(vzs)))
 
         spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
+        
         print('Angular spread: %.1f deg'%(spreadB))
+        
+        rHalf = halfRadius(z=z, which_flow=which_flow)
+        
+        print('Half radius {}'.format(round(1000*rHalf,3)))
+        
 
         if write == 1:
             with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/{}'.format(file), 'a') as tc:
                 tc.write('  '.join(map(str, [z, flowrate, round(np.mean(vzs),3), round(np.std(vzs),3), round(np.mean(vrs),3),\
-                         round(np.std(vrs),3), round(spreadB,3)] ))+'\n')
+                         round(np.std(vrs),3), round(spreadB,3), round(1000*rHalf, 3), WINDOW_RAD] ))+'\n')
 
             tc.close()
 
@@ -552,21 +633,21 @@ def plot_ncoll(numpoints=100, which_flow='f005'):
 
 def write_final_vz(write=0):
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/'
-    file = folder+'finalCenterLineVzs.dat'
-    
+    file = folder+'neckApertureCenterLineVzs.dat'
+
     if write == 1:
             with open(file, 'a') as tc:
                 tc.write('Fr    F     G     H\n')
                 for flowrate in ['002', '005', '010', '020', '050', '100', '200']:
-                    
-                        vzF = get_vz(0, 0, 0.25, 'f'+flowrate)
-                        vzG = get_vz(0, 0, 0.25, 'g'+flowrate)
-                        vzH = get_vz(0, 0, 0.25, 'h'+flowrate)
-                        
+
+                        vzF = get_vz(0, 0, 0.064, 'f'+flowrate)
+                        vzG = get_vz(0, 0, 0.064, 'g'+flowrate)
+                        vzH = get_vz(0, 0, 0.064, 'h'+flowrate)
+
                         tc.write('  '.join(map(str, [flowrate, round(vzF,3), round(vzG,3), round(vzH,3)] ))+'\n')
 
             tc.close()
-    
+
 
 
 #if __name__ == '__main__':
