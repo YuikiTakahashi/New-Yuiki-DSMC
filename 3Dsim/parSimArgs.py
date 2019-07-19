@@ -65,7 +65,7 @@ def get_flow_chars(filename):
 
     #e.g. filename = flows/G_Cell/DS2g020
     elif filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell"}[filename[16]]
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
     print(geometry)
@@ -170,8 +170,18 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in4 = r < (3.85/7.9)*(z-0.064)+0.0025 and z > 0.0640 and z < 0.0719
-        in5 = r < 0.030 and z >= 0.06785 and z < endPos #Remember to extend endPos!
+        in5 = r < 0.030 and z >= 0.0719 and z < endPos #Remember to extend endPos!
         inside = in1 + in2 + in3 + in4 + in5
+
+    elif form == 'kCell':
+        r = np.sqrt(x**2+y**2)
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0624
+        in2 = r < (38.5/11)*(0.0624-z)+0.00635 and z > 0.0624 and z < 0.0635
+        in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in4 = r < (3.85/7.9)*(z-0.064)+0.0025 and z > 0.0640 and z < 0.0719
+        in5 = r < 0.030 and z >= 0.0719 and z < endPos #Remember to extend endPos!
+        inside = in1 + in2 + in3 + in4 + in5
+
 
     return inside
 
@@ -189,7 +199,7 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-    elif form in ['fCell', 'gCell', 'hCell']:
+    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
         xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
         if abs(xFlow) > 1000:
             print(x, y, z, xFlow, 'm/s')
@@ -202,7 +212,7 @@ def setAmbientDensity(x, y, z, form='box'):
     global n
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
-    elif form in ['fCell', 'gCell', 'hCell']:
+    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
         n = dsmcQuant(x, y, z, f1)
         if abs(n) > 1e26:
             print(x, y, z, n, 'm-3')
@@ -215,7 +225,7 @@ def setAmbientTemp(x, y, z, form='box'):
     global T
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
-    elif form in ['fCell', 'gCell', 'hCell']:
+    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
         T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
             print(x, y, z, T, 'K')
@@ -285,7 +295,7 @@ def initial_species_position(L=0.01, form='', mode=0):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
-    if form not in ['fCell', 'gCell', 'hCell']:
+    if form not in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
         x = np.random.uniform(-L/2, L/2)
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
@@ -420,7 +430,7 @@ def showWalls():
 
     global geometry, INIT_MODE, PROBE_MODE
 
-    if geometry == 'hCell':
+    if geometry in ['hCell', 'jCell', 'kCell']:
         default_endPos = 0.24
     elif geometry in ['fCell', 'gCell']:
         default_endPos = 0.12
@@ -539,9 +549,9 @@ if __name__ == '__main__':
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
         #print("2")
 
-        if geometry == 'fCell' or geometry == 'gCell':
+        if geometry in ['fCell', 'gCell']:
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
-        elif geometry == 'hCell' or geometry == 'jCell':
+        elif geometry in ['hCell', 'jCell', 'kCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
         else:
             print('No geometry')
