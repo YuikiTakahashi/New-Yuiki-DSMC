@@ -314,12 +314,23 @@ def initial_species_position(L=0.01, form='', mode=0):
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.035, 0.045)
 
-        #Full-cell initial distribution for PROBE MODE
+        #Full-cell initial distribution for PROBE MODE in cell F
         elif mode==9:
             r = np.random.uniform(0,0.00635)
             ang = np.random.uniform(0, 2*np.pi)
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.015,0.0635)
+
+        #Full-cell initial distribution for PROBE MODE in cell H
+        elif mode==11:
+            z = np.random.uniform(0.015,0.0635)
+            ang = np.random.uniform(0, 2*np.pi)
+            if z <= 0.05965:
+                r = np.random.uniform(0,0.00635)
+            else:
+                r = np.random.uniform(0,0.066-z)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+
 
     return x, y, z
 
@@ -364,7 +375,9 @@ def endPosition(extPos=0.12):
     '''
 
     #LITE_MODE: if true, only write data to file once at the beginning, and when past the aperture.
+    #PROBE_MODE: if true, only write two lines per particle: initial and final
     #PARTICLE_NUMBER: total number of particles to simulate.
+
 
     #Important: need to properly retrieve geometry
     global vx, vy, vz, LITE_MODE, geometry, INIT_MODE, PROBE_MODE
