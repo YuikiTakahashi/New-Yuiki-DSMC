@@ -307,12 +307,14 @@ def initial_species_position(L=0.01, form='', mode=0):
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.030, 0.040)
 
+        #Standard initial distribution
         elif mode==0:
             r = np.random.uniform(0, 0.002)
             ang = np.random.uniform(0, 2*np.pi)
             x, y = r * np.cos(ang), r * np.sin(ang)
             z = np.random.uniform(0.035, 0.045)
 
+        #Full-cell initial distribution for PROBE MODE
         elif mode==9:
             r = np.random.uniform(0,0.00635)
             ang = np.random.uniform(0, 2*np.pi)
