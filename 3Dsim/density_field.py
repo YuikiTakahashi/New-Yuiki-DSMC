@@ -35,9 +35,9 @@ def main():
     plot_dens()
 
 def set_many():
-    flist = ['010','020','050','100','002','005']
+    flist = ['010','020','050','100','002','005','200']
     for f in flist:
-        set_params(FF='G_Cell/DS2g{}.DAT'.format(f))
+        set_params(FF='H_Cell/DS2h{}.DAT'.format(f))
 
 def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
@@ -86,8 +86,8 @@ def set_field(FF):
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
 
-        elif FF[10] in ['h']:
-            print('H geometry grid'.format(FF[10]))
+        elif FF[10] in ['h', 'j', 'k']:
+            print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
 
 

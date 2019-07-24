@@ -1360,9 +1360,9 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    seriesList = ['TimeColumn/plane94_mr.dat',\
-                'BevelGeometry/plane94_mr.dat',\
-                'ClusterLaval/plane3cm_mr.dat']
+    seriesList = ['TimeColumn/aperture_mr.dat',\
+                'BevelGeometry/aperture_mr.dat',\
+                'ClusterLaval/apertureWide_mr.dat']
 
     legends = {seriesList[0] : 'Straight Hole',\
                seriesList[1] : 'Beveled Aperture',\
@@ -1410,7 +1410,7 @@ def series_multirate_plots(plane=0.064):
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (3 cm past aperture)'.format(1000*plane)
+    title_note = '\n (At wide aperture)'.format(1000*plane)
 
     plt.title("Extraction vs Flow rate"+title_note)
     plt.xlabel("Flow [SCCM]")
