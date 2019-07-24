@@ -766,7 +766,8 @@ def fit_velocity_dist(vzs, vrs):
 
 MEDIAN_APERTURE_RADII = {'g200' : 1.135,\
                          'f21':1.397, 'f22':1.021, 'f23':1.212, 'f20':1.148, 'f19':0.819, 'f18':0.976,\
-                         'h002':1.271, 'h010':1.123, 'h020':0.976,'h050':0.791,'h100':0.938,'h200':1.158}
+                         'h002':1.271, 'h010':1.123, 'h020':0.976,'h050':0.791,'h100':0.938,'h200':1.158,\
+                         'j050':0.794}
 
 def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
     '''
@@ -791,7 +792,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     except:
         PREV_AP_RAD = 0.0
     
-    #This should be set to 120 for F and G geometries, 240 for H geometry
+    #This should be set to 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = 240
     
     #0.064 for f and g cell geometries, 0.06785 for h cell
@@ -828,7 +829,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
               'BevelGeometry':'BevelGeometry/{}.dat',\
-              'ClusterLaval':'ClusterLaval/{}.dat'}
+              'ClusterLaval':'ClusterLaval/{}.dat',\
+              'ClusterJCell':'ClusterJCell/{}.dat'}
     
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 #    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
@@ -848,7 +850,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     flowrate = {'f17':5, 'f18':20, 'f19':50, 'f20':10, 'f21':2, 'f22':100, 'f23':200,\
                 'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
                 'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200,\
-                'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200}[file_ext]
+                'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200,\
+                'j002':2, 'j010':10, 'j050':50}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1360,9 +1363,9 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    seriesList = ['TimeColumn/aperture_mr.dat',\
-                'BevelGeometry/aperture_mr.dat',\
-                'ClusterLaval/apertureWide_mr.dat']
+    seriesList = ['TimeColumn/plane94_mr.dat',\
+                'BevelGeometry/plane94_mr.dat',\
+                'ClusterLaval/plane94_mr.dat']
 
     legends = {seriesList[0] : 'Straight Hole',\
                seriesList[1] : 'Beveled Aperture',\

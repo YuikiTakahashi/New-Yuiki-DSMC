@@ -387,6 +387,11 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
     '''
     Returns statistics on vz, FWHM vz, angular spread, etc for a specified
     BG flow field, on a small window of radius WINDOW_RAD about the z-axis.
+    
+    plot = 1: Plots flow-dependent statistics for (file) geometry only.   
+    plot = 3: Plots statistics for every geometry in (fileList)
+    plot = 0: Plots velocities vs radius only for (which_flow)
+       write = 1: Writes statistics of (which_flow) to a row in (file)
     '''
     WINDOW_RAD=0.03
     ARRAY_SIZE = 2000
@@ -394,19 +399,22 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
     logscale=0
 
 #    fileList = ['Fcell.dat', 'Gcell.dat', 'Hcell.dat']
-    fileList = ['Fcell_plane.dat', 'Gcell_plane.dat', 'Hcell_plane.dat']
+    fileList = ['Fcell_plane.dat', 'Gcell_plane.dat', 'Hcell_plane.dat', 'Jcell_plane.dat']
 
     legends = {fileList[0] : 'Straight Hole',\
                fileList[1] : 'Beveled Aperture',\
-               fileList[2] : 'de Laval'}
+               fileList[2] : 'de Laval I (H)',\
+               fileList[3] : 'de Laval II (J)'}
 
     formats = {fileList[0] : 'go',\
                fileList[1] : 'ro',\
-               fileList[2] : 'co'}
+               fileList[2] : 'co',\
+               fileList[3] : 'yo'}
 
     linestyles = {fileList[0] : '--',\
-                  fileList[1] : ':',\
-                  fileList[2] : ':'}
+                  fileList[1] : '--',\
+                  fileList[2] : ':',\
+                  fileList[3] : ':'}
 
 
     fr_dic, ext_dic, sigE_dic, vr_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic,rhalf_dic = {},{},{},{},{},{},{},{},{}
@@ -439,7 +447,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.show()
         plt.clf()
         
-        plt.title("Gas FWHM vs Flow")
+        plt.title("Gas FWHM vs Flow\n(Plane 3cm past aperture)")
         plt.errorbar(x=frs, y=rHalf, fmt='ro')
         plt.xlabel("Flow [SCCM]")
         plt.ylabel("Half Radius [mm]")
@@ -498,12 +506,12 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.show()
         plt.clf()
         
-        plt.title("Density FWHM vs Flow")
+        plt.title("Density FWHM vs Flow\n(Buffer gas 3cm past aperture)")
         plt.xlabel("Flow [SCCM]")
         plt.ylabel("Half Radius [mm]")
         # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
         for file in fileList:
-            plt.errorbar(x=(fr_dic[file])[0:5], y=(rhalf_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+            plt.errorbar(x=(fr_dic[file])[0:7], y=(rhalf_dic[file])[0:7], label=legends[file], fmt=formats[file],ls=linestyles[file])
         plt.legend()
         plt.show()
         plt.clf()
