@@ -1,16 +1,27 @@
 from argparse import ArgumentParser
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 APERTURE_POS = 64.0 #z axis location of aperture in mm
 
-def showPlot():
+def showPlot(dotSize, cellGeometry):
+
+    lineWidth = 2.
     pos0 = 0.064
     folder = "C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/Probe/"
-    fileList = ['Set1/probeResults.dat',\
-                'Set2/probeResults.dat',\
-                'Set3/probeResults.dat']#,\
-                # 'probeAnalysis17.dat']
+    # fileList = ['f5/Set1/probeResults.dat',\
+    #             'f5/Set2/probeResults.dat',\
+    #             'f5/Set3/probeResults.dat',\
+    #             'f5/Set4/probeResults.dat']#,\
+    #             # 'f5/probeAnalysis17.dat']
+
+
+    fileList = ['h5/Set1/probeResults.dat',\
+                'h5/Set2/probeResults.dat',\
+                'h5/Set3/probeResults.dat',\
+                'h5/Set4/probeResults.dat']
+
 
     arrayDic = {}
     totalParticles = 0
@@ -38,19 +49,30 @@ def showPlot():
     # xs = finals[:, 0] / 1000.
     # ys = finals[:, 1] / 1000.
     # zs = finals[:, 2] / 1000.
-    green = plt.cm.Greens(100)
-    red = plt.cm.Reds(100)
-    plt.scatter(x=z1, y=np.sqrt(x1**2+y1**2), c=green, s=1)
-    plt.scatter(x=z0, y=np.sqrt(x0**2+y0**2), c=red, s=1)
+    green = plt.cm.Greens(160)
+    red = plt.cm.Reds(120)
+    plt.scatter(x=z1, y=np.sqrt(x1**2+y1**2), c=green, s=dotSize)
+    plt.scatter(x=z0, y=np.sqrt(x0**2+y0**2), c=red, s=dotSize)
 
-    plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
-    plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
-    plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
-    plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
-    plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
-    plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
-    plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
-    plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+    plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=lineWidth)
+    plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=lineWidth)
+    plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=lineWidth)
+
+    if cellGeometry == 'f':
+        plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=lineWidth)
+        plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=lineWidth)
+        plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=lineWidth)
+        plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=lineWidth)
+        plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=lineWidth)
+
+    elif cellGeometry == 'h':
+        plt.hlines(0.00635, 0.015, 0.05965, colors='gray', linewidths=lineWidth)
+        plt.plot([0.05965,0.0635],[0.00635,0.0025], color='gray', linewidth=lineWidth)
+        plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=lineWidth)
+        plt.plot([0.064,0.06785],[0.0025,0.00635], color='gray', linewidth=lineWidth)
+        plt.vlines(0.06785,0.00635,0.009, colors='gray', linewidths=lineWidth)
+        plt.hlines(0.009, 0, 0.06785, colors='gray', linewidths=lineWidth)
+
     plt.xlim(0, pos0+0.01)
     plt.ylim(0, 0.01)
     plt.show()
@@ -136,6 +158,8 @@ if __name__ == '__main__':
     parser.add_argument('-fin', '--readfile')
     parser.add_argument('--write', dest='write', action='store_true', default=False)
     parser.add_argument('--plot', dest='plot', action='store_true', default=False)
+    parser.add_argument('--dotsize', dest='dotsize', type=int, default=1)
+    parser.add_argument('--geom', dest='geom', default='f')
     args=parser.parse_args()
 
     directory = args.direc
@@ -143,8 +167,10 @@ if __name__ == '__main__':
     READFILE = args.readfile
     write = args.write
     plot = args.plot
+    dotSize = args.dotsize
+    geometry = args.geom
 
     if plot:
-        showPlot()
+        showPlot(dotSize, geometry)
     else:
         analyzeFiles(directory, OUTFILE, READFILE, write)
