@@ -851,7 +851,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
                 'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200,\
                 'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200,\
-                'j002':2, 'j010':10, 'j050':50}[file_ext]
+                'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1215,6 +1215,11 @@ def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False
 # value for the zs
 # =============================================================================
 def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
+    '''
+    Iterate through each of the flowrates, for a given geometry, and either write
+    the output from analyzeTrajData to a file, or plot the analysis from the file,
+    i.e. PROP vs Flowrate for each of PROP = Vz, Spread, VzFWHM, etc.
+    '''
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 #    fileList = ['g002','g005','g010','g020','g050','g100','g200']
@@ -1363,21 +1368,26 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    seriesList = ['TimeColumn/plane94_mr.dat',\
-                'BevelGeometry/plane94_mr.dat',\
-                'ClusterLaval/plane94_mr.dat']
+    seriesList = ['TimeColumn/window94_mr.dat',\
+                'BevelGeometry/window94_mr.dat',\
+                'ClusterLaval/window94_mr.dat',\
+                'ClusterJCell/window94.dat']
 
     legends = {seriesList[0] : 'Straight Hole',\
                seriesList[1] : 'Beveled Aperture',\
-               seriesList[2] : 'de Laval'}
+               seriesList[2] : 'de Laval I (H)',\
+               seriesList[3] : 'de Laval II (J)'
+               }
 
     formats = {seriesList[0] : 'go',\
                seriesList[1] : 'ro',\
-               seriesList[2] : 'co'}
+               seriesList[2] : 'co',\
+               seriesList[3] : 'yo'}
 
     linestyles = {seriesList[0] : '--',\
-                  seriesList[1] : ':',\
-                  seriesList[2] : ':'}
+                  seriesList[1] : '--',\
+                  seriesList[2] : ':',\
+                  seriesList[3] : ':'}
 
 #    seriesList = ['TimeColumn/far_plane.dat',\
 #                  'InitLarge/plane94.dat']
@@ -1413,7 +1423,7 @@ def series_multirate_plots(plane=0.064):
 
     # print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-    title_note = '\n (At wide aperture)'.format(1000*plane)
+    title_note = '\n (Small patch 3cm from neck)'.format(1000*plane)
 
     plt.title("Extraction vs Flow rate"+title_note)
     plt.xlabel("Flow [SCCM]")

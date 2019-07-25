@@ -20,7 +20,9 @@ def showPlot(dotSize, cellGeometry):
     fileList = ['h5/Set1/probeResults.dat',\
                 'h5/Set2/probeResults.dat',\
                 'h5/Set3/probeResults.dat',\
-                'h5/Set4/probeResults.dat']
+                'h5/Set4/probeResults.dat',\
+                'h5/Set5/probeResults.dat',\
+                'h5/Set6/probeResults.dat']
 
 
     arrayDic = {}
@@ -49,7 +51,7 @@ def showPlot(dotSize, cellGeometry):
     # xs = finals[:, 0] / 1000.
     # ys = finals[:, 1] / 1000.
     # zs = finals[:, 2] / 1000.
-    green = plt.cm.Greens(160)
+    green = plt.cm.Greens(175)
     red = plt.cm.Reds(120)
     plt.scatter(x=z1, y=np.sqrt(x1**2+y1**2), c=green, s=dotSize)
     plt.scatter(x=z0, y=np.sqrt(x0**2+y0**2), c=red, s=dotSize)
