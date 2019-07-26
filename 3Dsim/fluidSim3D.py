@@ -830,7 +830,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
               'BevelGeometry':'BevelGeometry/{}.dat',\
               'ClusterLaval':'ClusterLaval/{}.dat',\
-              'ClusterJCell':'ClusterJCell/{}.dat'}
+              'ClusterJCell':'ClusterJCell/{}.dat',\
+              'ClusterKCell':'ClusterKCell/{}.dat'}
     
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 #    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
@@ -851,7 +852,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'g200':200, 'g005':5, 'g010':10, 'g020':20, 'g002':2, 'g050':50, 'g100':100,\
                 'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200,\
                 'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200,\
-                'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200}[file_ext]
+                'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200,\
+                'k002':2, 'k005':5, 'k010':10, 'k020':20, 'k050':50, 'k100':100, 'k200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1316,6 +1318,7 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
 
 
 
+
 # =============================================================================
 # Plotting quantities (extraction, forward velocity, forward temperature) for
 # for various sets of data e.g. different collision cross sections
@@ -1368,26 +1371,54 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    seriesList = ['TimeColumn/window94_mr.dat',\
-                'BevelGeometry/window94_mr.dat',\
-                'ClusterLaval/window94_mr.dat',\
-                'ClusterJCell/window94.dat']
-
-    legends = {seriesList[0] : 'Straight Hole',\
-               seriesList[1] : 'Beveled Aperture',\
-               seriesList[2] : 'de Laval I (H)',\
-               seriesList[3] : 'de Laval II (J)'
-               }
-
-    formats = {seriesList[0] : 'go',\
-               seriesList[1] : 'ro',\
-               seriesList[2] : 'co',\
-               seriesList[3] : 'yo'}
-
-    linestyles = {seriesList[0] : '--',\
-                  seriesList[1] : '--',\
-                  seriesList[2] : ':',\
-                  seriesList[3] : ':'}
+    dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
+             'BevelGeometry/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
+              'ClusterLaval/plane94_mr.dat' : (1, 'de Laval I (H)', 'o', ':') ,\
+                 'ClusterJCell/plane94.dat' : (1, 'de Laval II (J)', 'o', ':') ,\
+                 'ClusterKCell/plane94.dat' : (1, 'de Laval III (K)', 'o', ':'),\
+                 
+                 'TimeColumn/plane94_mr.dat': (0, 'Straight Hole', 'o', '--'),\
+#                'BevelGeometry/plane94_mr.dat',\
+#                'ClusterLaval/plane94_mr.dat',\
+#                'ClusterJCell/plane94.dat',\
+#                'ClusterKCell/plane94.dat'                  
+             }
+    
+    seriesList, legends, formats, linestyles = [], {}, {}, {}
+    
+    
+    for x in dataSets:
+        if dataSets[x][0] == 1:
+            seriesList.append(x)
+            legends.update( {x : dataSets[x][1]} )
+            formats.update( {x : dataSets[x][2]} )
+            linestyles.update( {x : dataSets[x][3]} )
+    
+    
+#    seriesList = ['TimeColumn/plane94_mr.dat',\
+#                'BevelGeometry/plane94_mr.dat',\
+#                'ClusterLaval/plane94_mr.dat',\
+#                'ClusterJCell/plane94.dat',\
+#                'ClusterKCell/plane94.dat']
+#
+#    legends = {seriesList[0] : 'Straight Hole',\
+#               seriesList[1] : 'Beveled Aperture',\
+#               seriesList[2] : 'de Laval I (H)',\
+#               seriesList[3] : 'de Laval II (J)',\
+#               seriesList[4] : 'de Laval III (K)'
+#               }
+#
+#    formats = {seriesList[0] : 'o',\
+#               seriesList[1] : 'o',\
+#               seriesList[2] : 'o',\
+#               seriesList[3] : 'o',\
+#               seriesList[4] : 'o'}
+#
+#    linestyles = {seriesList[0] : '--',\
+#                  seriesList[1] : '--',\
+#                  seriesList[2] : ':',\
+#                  seriesList[3] : ':',\
+#                  seriesList[4] : ':'}
 
 #    seriesList = ['TimeColumn/far_plane.dat',\
 #                  'InitLarge/plane94.dat']
