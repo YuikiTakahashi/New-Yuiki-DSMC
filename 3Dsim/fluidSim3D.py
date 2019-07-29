@@ -1371,14 +1371,17 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
-             'BevelGeometry/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
-              'ClusterLaval/plane94_mr.dat' : (1, 'de Laval I (H)', 'o', ':') ,\
-                 'ClusterJCell/plane94.dat' : (1, 'de Laval II (J)', 'o', ':') ,\
-                 'ClusterKCell/plane94.dat' : (1, 'de Laval III (K)', 'o', ':'),\
+    dataSets = {'TimeColumn/plane94_mr.dat' : (1, 'Straight Hole', 'o', '--') ,\
+             'BevelGeometry/plane94_mr.dat' : (1, 'Beveled Aperture', 'o', '--') ,\
+              'ClusterLaval/plane94_mr.dat' : (1, 'Hourglass', 'o', ':') ,\
+                 'ClusterJCell/plane94.dat' : (1, 'de Laval', 'o', ':') ,\
+                 'ClusterKCell/plane94.dat' : (0, 'de Laval III (K)', 'o', ':'),\
                  
-                 'TimeColumn/plane94_mr.dat': (0, 'Straight Hole', 'o', '--'),\
-#                'BevelGeometry/plane94_mr.dat',\
+             
+               'TimeColumn/window94_mr.dat' : (0, 'Straight Hole', 'o', '--'),\
+            'BevelGeometry/window94_mr.dat' : (0, 'Beveled Aperture', 'o', '--'),\
+             'ClusterLaval/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
+                'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--')
 #                'ClusterLaval/plane94_mr.dat',\
 #                'ClusterJCell/plane94.dat',\
 #                'ClusterKCell/plane94.dat'                  
@@ -1456,13 +1459,13 @@ def series_multirate_plots(plane=0.064):
 
     title_note = '\n (Small patch 3cm from neck)'.format(1000*plane)
 
-    plt.title("Extraction vs Flow rate"+title_note)
+    #plt.title("Extraction vs Flow rate"+title_note)
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
     for file in seriesList:
-        plt.errorbar(x=(fr_dic[file])[0:8], y=(ext_dic[file])[0:8], yerr=(sigE_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:5], y=(ext_dic[file])[0:5], yerr=(sigE_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1472,8 +1475,9 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
+    howMany = 5
     for file in seriesList:
-        plt.errorbar(x=(fr_dic[file])[0:8], y=(vz_dic[file])[0:8], yerr=(vzSig_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1511,12 +1515,13 @@ def series_multirate_plots(plane=0.064):
     plt.show()
     plt.clf()
 
-    plt.title("Beam Spread vs Flow"+title_note)
+    plt.title("Beam Spread vs Flow")
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Median Beam Radius [mm]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
+    howMany = 5
     for file in seriesList:
-        plt.errorbar(x=(fr_dic[file])[0:8], y=(medRad_dic[file])[0:8], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:howMany], y=(medRad_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()

@@ -387,7 +387,7 @@ def endPosition(extPos=0.12):
     traj = []
     np.random.seed()
     x, y, z = initial_species_position(L=.01, form=geometry, mode=INIT_MODE)
-    vx, vy, vz = initial_species_velocity(T_s0=4)
+    vx, vy, vz = initial_species_velocity(T_s0=4) #Thermalized to 4K environment
     sim_time = 0.0 #Tracking simulation time
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
