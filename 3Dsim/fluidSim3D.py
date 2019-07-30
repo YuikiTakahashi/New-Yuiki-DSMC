@@ -783,19 +783,19 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     The default dome is set to radius r=0.02 m.
     '''
     print('The aperture is at z = 0.064 m.')
-    
+
 #    PREV_AP_RAD = 1.167
-    
+
     try:
         PREV_AP_RAD = MEDIAN_APERTURE_RADII[file_ext] #mm
-    
+
     except:
         PREV_AP_RAD = 0.0
-    
-    #This should be set to 120 for F and G geometries, 240 for H, J, K geometries
+
+    #This should be 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = 240
-    
-    #0.064 for f and g cell geometries, 0.06785 for h cell
+
+    #0.064 for f and g cell geometries, 0.06785 for h, j, k cells
     DEFAULT_APERTURE = 0.06785
 
     #64 mm for f/g, 67.85mm for h
@@ -803,7 +803,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     x_center=0
     y_center=0  #Coordinates of bowl center
 
-    
+
 
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
@@ -826,13 +826,13 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #Nx6 array. Organized by x,y,z,vx,vy,vz
 
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
-    
+
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
               'BevelGeometry':'BevelGeometry/{}.dat',\
               'ClusterLaval':'ClusterLaval/{}.dat',\
               'ClusterJCell':'ClusterJCell/{}.dat',\
               'ClusterKCell':'ClusterKCell/{}.dat'}
-    
+
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 #    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
 #    f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
@@ -840,7 +840,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 #    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
 #    f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1)
 #    f = np.loadtxt(directory + 'InitLarge/{}_init1.dat'.format(file_ext), skiprows=1)
-    
+
     f = np.loadtxt(directory+ (folder_sw[folder]).format(file_ext), skiprows=1)
 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
@@ -1060,8 +1060,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         plt.show()
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
-        
-        
+
+
 
 #        plt.title("Radial Distribution" + dep_title_flow)
 #        #plt.title("Radial Distribution at r = %g m"%dome_rad)
@@ -1228,7 +1228,7 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
 
     folder = 'ClusterLaval'
-    
+
     if write==True:
         for f in fileList:
             analyzeTrajData(f, folder, file, pos=plane, write=True, rad_mode=False)
@@ -1372,56 +1372,29 @@ def series_multirate_plots(plane=0.064):
 #############################################################
 
     dataSets = {'TimeColumn/plane94_mr.dat' : (1, 'Straight Hole', 'o', '--') ,\
-             'BevelGeometry/plane94_mr.dat' : (1, 'Beveled Aperture', 'o', '--') ,\
-              'ClusterLaval/plane94_mr.dat' : (1, 'Hourglass', 'o', ':') ,\
+             'BevelGeometry/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
+              'ClusterLaval/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
                  'ClusterJCell/plane94.dat' : (1, 'de Laval', 'o', ':') ,\
-                 'ClusterKCell/plane94.dat' : (0, 'de Laval III (K)', 'o', ':'),\
-                 
-             
+                 'ClusterKCell/plane94.dat' : (1, 'de Laval III (K)', 'o', ':'),\
+
+
                'TimeColumn/window94_mr.dat' : (0, 'Straight Hole', 'o', '--'),\
             'BevelGeometry/window94_mr.dat' : (0, 'Beveled Aperture', 'o', '--'),\
              'ClusterLaval/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
-                'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--')
-#                'ClusterLaval/plane94_mr.dat',\
-#                'ClusterJCell/plane94.dat',\
-#                'ClusterKCell/plane94.dat'                  
+                'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
+                'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--')
              }
-    
+
     seriesList, legends, formats, linestyles = [], {}, {}, {}
-    
-    
+
+
     for x in dataSets:
         if dataSets[x][0] == 1:
             seriesList.append(x)
             legends.update( {x : dataSets[x][1]} )
             formats.update( {x : dataSets[x][2]} )
             linestyles.update( {x : dataSets[x][3]} )
-    
-    
-#    seriesList = ['TimeColumn/plane94_mr.dat',\
-#                'BevelGeometry/plane94_mr.dat',\
-#                'ClusterLaval/plane94_mr.dat',\
-#                'ClusterJCell/plane94.dat',\
-#                'ClusterKCell/plane94.dat']
-#
-#    legends = {seriesList[0] : 'Straight Hole',\
-#               seriesList[1] : 'Beveled Aperture',\
-#               seriesList[2] : 'de Laval I (H)',\
-#               seriesList[3] : 'de Laval II (J)',\
-#               seriesList[4] : 'de Laval III (K)'
-#               }
-#
-#    formats = {seriesList[0] : 'o',\
-#               seriesList[1] : 'o',\
-#               seriesList[2] : 'o',\
-#               seriesList[3] : 'o',\
-#               seriesList[4] : 'o'}
-#
-#    linestyles = {seriesList[0] : '--',\
-#                  seriesList[1] : '--',\
-#                  seriesList[2] : ':',\
-#                  seriesList[3] : ':',\
-#                  seriesList[4] : ':'}
+
 
 #    seriesList = ['TimeColumn/far_plane.dat',\
 #                  'InitLarge/plane94.dat']
@@ -1464,8 +1437,9 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
+    howMany = 8
     for file in seriesList:
-        plt.errorbar(x=(fr_dic[file])[0:5], y=(ext_dic[file])[0:5], yerr=(sigE_dic[file])[0:5], label=legends[file], fmt=formats[file],ls=linestyles[file])
+        plt.errorbar(x=(fr_dic[file])[0:howMany], y=(ext_dic[file])[0:howMany], yerr=(sigE_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
     plt.show()
     plt.clf()
@@ -1475,7 +1449,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    howMany = 5
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
