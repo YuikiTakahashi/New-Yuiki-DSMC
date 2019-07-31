@@ -1,95 +1,144 @@
-
 import numpy as np
-import scipy.stats as st
-import scipy.interpolate as si
-from joblib import Parallel, delayed
-from multiprocessing import Pool
-import itertools
-import argparse
-import sys
 
-global z0, endPos, LZ, RMAX, NZ, NR, z_axis, r_axis
+directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/'
+file_ext = 'traj017d.dat'
 
-z0 = 0.015
-endPos = 0.120
+#Data for x, y, z comes in mm 
+z0 = 0.015*1000
+endPos = 0.120*1000
 LZ = endPos - z0
-RMAX = 0.00635
+RMAX = 0.00635*1000
 
-NZ = 1000
+
+#Sets grid resolution in the Z and R axes
+NZ = 1000 
 NR = 1000
 
-z_axis = np.ones(NZ+1)
-r_axis = np.ones(NR+1)
 
 
-#This way, z_axis[k] = z_k and
-#          r_axis[k] = r_k
 
-for i in range(NZ+1):
-    z_axis[i] = z0 + i*(LZ / NZ)
-
-for i in range(NR+1):
-    r_axis[i] = i*(RMAX / NR)
-
-directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
-
-f = np.loadtxt(directory+filename), skiprows=1)
-
-numParticles = 0 #number of simulated particles
-for i in range(len(f)):
-    if not np.any(f[i]):
-        numParticles += 1 # count number of particles simulated in file
-
-VR_LISTS, VZ_LISTS, V_LISTS = {}, {}, {}, {}
-
-for i in range(NZ):
-    for j in range(NR):
-        V_LISTS.update( {(i,j) : []} )
-        VR_LISTS.update( {(i,j) : []} )
-        VZ_LISTS.update( {(i,j) : []} )
-
-
-vr_temp, vz_temp, v_temp = [], [], [], []
-
-prev_loc = None
-current_loc = (0,0)
-
-for i in range(len(f)):
-
-#NEED TO HANDLE CHANGE OF PARTICLES I.E. AFTER WE REACH A ROW OF ZEROS
-
-    if np.any(f[i]):
-        x, y, z, vx, vy, vz, tim = f[i-1]
-        r = np.sqrt(x**2+y**2)
-        vr = np.sqrt(vx**2 + vy**2)
-
-        #Stores index (zk, rk) of z-region and r-region, for current particle location
-        current_loc = zRegion(z, prev_loc[0]), rRegion(r, prev_loc[1])
-
-        #If we are in the same sector of the grid, just add data to the buffer arrays
-        if current_loc == prev_loc:
+def main():
+    global f, numParticles
+    
+    tally = 0
+    
+    vr_temp, vz_temp, v_temp = [], [], []
+    
+    prev_loc = None
+    current_loc = (0,0)
+    
+    #Iterate through every line in the particle data file
+    for i in range(len(f)):
+        
+    
+        #If reach a row of zeros, reset for the next particle and save previous buffer array
+        if not np.any(f[i]):
+            tally += 1 #Keeping track of particles analyzed so far
+            print("Analyzed particle {0} of {1}: {2}% done".format(tally, numParticles,round(100*tally/numParticles,2)))
+            
+            VR_LISTS[prev_loc].append( np.mean(vr_temp) )
+            VZ_LISTS[prev_loc].append( np.mean(vz_temp) )
+            V_LISTS[prev_loc].append( np.mean(v_temp) )
+            prev_loc = None #Reset location
+            vr_temp, vz_temp, v_temp = [], [], [] #Clear buffer arrays
+    
+    
+        #If we are beginning logging for a new particle, need to guess grid location
+        elif prev_loc == None:
+    
+            x, y, z, vx, vy, vz = f[i]
+            r = np.sqrt(x**2+y**2)
+            vr = np.sqrt(vx**2 + vy**2)
+            current_loc = zRegion(z=z, prev_k=0), rRegion(r=r, prev_k=0) #Guess initial grid location is 0,0
+            prev_loc = current_loc
             vr_temp.append(vr)
             vz_temp.append(vz)
             v_temp.append(np.sqrt(vr**2 + vz**2))
+    
+    
+        #Continue logging for current particle, can tell where to look
+        else:
+            x, y, z, vx, vy, vz = f[i]
+            r = np.sqrt(x**2+y**2)
+            vr = np.sqrt(vx**2 + vy**2)
+            current_loc = zRegion(z, prev_loc[0]), rRegion(r, prev_loc[1])
+    
+            #If we are in the same sector of the grid, just add data to the buffer arrays
+            if current_loc == prev_loc:
+                vr_temp.append(vr)
+                vz_temp.append(vz)
+                v_temp.append(np.sqrt(vr**2 + vz**2))
+    
+            elif current_loc != prev_loc:
+                #Take means of the buffer arrays and store them in the previous location of the map
+    
+                VR_LISTS[prev_loc].append( np.mean(vr_temp) )
+                VZ_LISTS[prev_loc].append( np.mean(vz_temp) )
+                V_LISTS[prev_loc].append( np.mean(v_temp) )
+    
+                #Now clear the buffer arrays and start logging info for the new location
+                vr_temp = [vr]
+                vz_temp = [vz]
+                v_temp = [np.sqrt(vr**2 + vz**2)]
+    
+                prev_loc = current_loc
 
-        elif current_loc != prev_loc: #and the buffer is not empty
-            #Take means of the buffer arrays and store them in the previous location of the map
-            vrMean = np.mean(vr_temp)
-            vzMean = np.mean(vz_temp)
-            vMean = np.mean(v_temp)
 
-            VR_LISTS[prev_loc].append(vrMean)
-            VZ_LISTS[prev_loc].append(vzMean)
-            V_LISTS[prev_loc].append(vMean)
-
-            #Now clear the buffer arrays and start logging info for the new location
-            vr_temp = [vr]
-            vz_temp = [vz]
-            v_temp = [np.sqrt(vr**2 + vz**2)]
-
-            prev_loc = current_loc
+# =============================================================================
+# Initializing data matrix, velocity maps and z/r axes
+# =============================================================================
+def initialize():
+    global directory, file_ext, NR, NZ
+    
+    print('Getting data from {}...'.format(file_ext), end='')
+    get_data(directory+file_ext)
+    
+    print('Making velocity maps, {}x{} grid'.format(NR,NZ))
+    make_vlists(NZ, NR)
+    
+    print('Done initializing')
 
 
+
+def get_data(file):
+    global f, numParticles
+    
+    f = np.loadtxt(file, skiprows=1)
+
+    numParticles = 0
+    for i in range(len(f)):
+        if not np.any(f[i]):
+            numParticles += 1 # count number of particles simulated in file
+
+    print(' {} particles'.format(numParticles))
+
+
+
+def make_vlists(NZ, NR):
+    global V_LISTS, VR_LISTS, VZ_LISTS, z_axis, r_axis, z0, LZ, RMAX
+
+    VR_LISTS, VZ_LISTS, V_LISTS = {}, {}, {}
+
+    z_axis = np.ones(NZ+1)
+    r_axis = np.ones(NR+1)
+
+    for i in range(NZ):
+        for j in range(NR):
+            V_LISTS.update(  {(i,j) : []} )
+            VR_LISTS.update( {(i,j) : []} )
+            VZ_LISTS.update( {(i,j) : []} )
+
+    for i in range(NZ+1):
+        z_axis[i] = z0 + i*(LZ / NZ)
+
+    for i in range(NR+1):
+        r_axis[i] = i*(RMAX / NR)
+
+
+
+# =============================================================================
+# Methods for locating particles on the grid
+# =============================================================================
 def zRegion(z, prev_k):
     global z_axis
 
@@ -97,18 +146,18 @@ def zRegion(z, prev_k):
     while True:
 
         #Check on the right
-        if z_axis[prev_k + delta] < z and z < z_axis[prev_k + 1 + delta]:
+        if prev_k+delta+1 < len(z_axis) and z_axis[prev_k + delta] < z and z < z_axis[prev_k + 1 + delta]:
             return prev_k + delta
 
         #Check on the left
-        elif z_axis[prev_k - delta] < z and z < z_axis[prev_k + 1 - delta]:
+        elif prev_k-delta >= 0 and z_axis[prev_k - delta] < z and z < z_axis[prev_k + 1 - delta]:
             return prev_k - delta
 
         #Search next neighbor
         else:
             delta += 1
 
-def rRegion(r, prev_r):
+def rRegion(r, prev_k):
     global r_axis
 
     delta = 0

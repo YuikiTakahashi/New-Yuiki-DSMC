@@ -793,7 +793,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         PREV_AP_RAD = 0.0
 
     #This should be 120 for F and G geometries, 240 for H, J, K geometries
-    DEFAULT_ENDPOS = 240
+    DEFAULT_ENDPOS = {'f':120, 'g':120,\
+                      'h':240, 'j':240, 'k':240}[file_ext[0]]
 
     #0.064 for f and g cell geometries, 0.06785 for h, j, k cells
     DEFAULT_APERTURE = 0.06785
@@ -828,10 +829,13 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
+                  'InitLarge':'InitLarge/{}_init1.dat',\
               'BevelGeometry':'BevelGeometry/{}.dat',\
-              'ClusterLaval':'ClusterLaval/{}.dat',\
-              'ClusterJCell':'ClusterJCell/{}.dat',\
-              'ClusterKCell':'ClusterKCell/{}.dat'}
+               'ClusterLaval':'ClusterLaval/{}.dat',\
+               'ClusterJCell':'ClusterJCell/{}.dat',\
+               'ClusterKCell':'ClusterKCell/{}.dat',\
+             'InitLargeKCell':'InitLargeKCell/{}_init1.dat'\
+                }
 
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
 #    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
@@ -1185,32 +1189,6 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
         tc.close()
 
-
-    #Important: specifying radius also specifies labels for plots
-def multiFlowAnalyzeDome(in_file, out_file, radius=0.04, write=False, plot=False):
-    fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
-
-    if write==True:
-        for f in fileList:
-            analyzeTrajData(f, out_file, write=True, rad_mode=True, dome_rad=radius)
-
-    if plot == True:
-        f = np.loadtxt('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(in_file), skiprows=1)
-
-        rs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
-        thetas, thetaSig, times, timeSig, reyn, spreadB = f[:,0], f[:,1], f[:,2], \
-        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
-        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15]
-
-        print("Rs: {},\n frs: {},\n gammas: {},\n times: {}".format(rs,frs,gammas,times))
-
-        plt.title("Pumpout time vs flowrate")
-        plt.errorbar(x=frs, y=times, yerr=timeSig, fmt='ro')
-        plt.ylabel("Arrival time at r={} m(ms)".format(radius))
-        plt.xlabel("Flowrate (SCCM)")
-        plt.show()
-        plt.clf()
-
 # =============================================================================
 # Important: specifing plane also specifies labels for plots. This means it is
 # best to keep each data file with the same plane position i.e. keep only a single
@@ -1225,9 +1203,9 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 #    fileList = ['g002','g005','g010','g020','g050','g100','g200']
-    fileList = ['h002', 'h005', 'h010', 'h020', 'h050', 'h100', 'h200']
+    fileList = ['f002', 'f005', 'f010', 'f020', 'f050', 'f100', 'f200']
 
-    folder = 'ClusterLaval'
+    folder = 'InitLarge'
 
     if write==True:
         for f in fileList:
@@ -1371,18 +1349,26 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    dataSets = {'TimeColumn/plane94_mr.dat' : (1, 'Straight Hole', 'o', '--') ,\
+    dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
              'BevelGeometry/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
               'ClusterLaval/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
-                 'ClusterJCell/plane94.dat' : (1, 'de Laval', 'o', ':') ,\
-                 'ClusterKCell/plane94.dat' : (1, 'de Laval III (K)', 'o', ':'),\
+                 'ClusterJCell/plane94.dat' : (0, 'de Laval', 'o', ':') ,\
+                 'ClusterKCell/plane94.dat' : (0, 'de Laval III (K)', 'o', ':'),\
 
 
                'TimeColumn/window94_mr.dat' : (0, 'Straight Hole', 'o', '--'),\
             'BevelGeometry/window94_mr.dat' : (0, 'Beveled Aperture', 'o', '--'),\
              'ClusterLaval/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
-                'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--')
+                'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
+                
+                'InitLarge/window94_mr.dat' : (0, 'Straight (i-1)', 'o', '--'),\
+              'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
+              
+                 'InitLarge/plane94_mr.dat' : (1, 'Straight (i-1)', 'o', '--'),\
+               'InitLargeKCell/plane94.dat' : (1, 'de Laval K (i-1)', 'o', '--'),\
+                
+                
              }
 
     seriesList, legends, formats, linestyles = [], {}, {}, {}
@@ -1437,7 +1423,7 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-    howMany = 8
+    howMany = 5
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(ext_dic[file])[0:howMany], yerr=(sigE_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
@@ -1493,7 +1479,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Median Beam Radius [mm]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-    howMany = 5
+    howMany = 6
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(medRad_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
