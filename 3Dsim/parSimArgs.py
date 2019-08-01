@@ -18,8 +18,10 @@ import itertools
 import argparse
 import sys
 #import matplotlib.pyplot as plt
-
 from collections import defaultdict
+
+knownGeometries = ['fCell', 'gCell', 'hCell', 'jCell', 'kCell', 'mCell']
+
 
 class CallBack(object):
     completed = defaultdict(int)
@@ -58,16 +60,12 @@ def get_flow_chars(filename):
     '''
     global flowrate, geometry
 
-    #e.g. filename = DS2FFg020
-    if filename[0:5] == "flows/DS2FF":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell"}[filename[5]]
-        flowrate = int(filename[4:7])
-
     #e.g. filename = flows/G_Cell/DS2g020
-    elif filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell"}[filename[16]]
+    if filename[13:16] == "DS2":
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell"}[filename[16]]
         flowrate = int(filename[17:20])
-
+    else:
+        raise ValueError('Could not recognize the DS2 flow file')
     print(geometry)
     print(flowrate)
 
@@ -146,6 +144,7 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in3 = r < 0.030 and z >= 0.0640 and z < endPos
         inside = in1 + in2 + in3
+        return inside
 
     elif form == 'gCell':
         r = np.sqrt(x**2+y**2)
@@ -154,6 +153,7 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in4 = r < 0.030 and z >= 0.0640 and z <  endPos
         inside = in1 + in2 + in3 + in4
+        return inside
 
     elif form == 'hCell':
         r = np.sqrt(x**2+y**2)
@@ -172,6 +172,7 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in4 = r < (3.85/7.9)*(z-0.064)+0.0025 and z > 0.0640 and z < 0.0719
         in5 = r < 0.030 and z >= 0.0719 and z < endPos #Remember to extend endPos!
         inside = in1 + in2 + in3 + in4 + in5
+        return inside
 
     elif form == 'kCell':
         r = np.sqrt(x**2+y**2)
@@ -181,9 +182,23 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in4 = r < (3.85/7.9)*(z-0.064)+0.0025 and z > 0.0640 and z < 0.0719
         in5 = r < 0.030 and z >= 0.0719 and z < endPos #Remember to extend endPos!
         inside = in1 + in2 + in3 + in4 + in5
+        return inside
 
+    elif form == 'mCell':
+        r = np.sqrt(x**2+y**2)
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in3 = r < 0.009 and z > 0.064 and z < 0.068
+        in4 = r < 0.00635 and z > 0.068 and z < 0.07275
+        in5 = r < 0.009 and z > 0.07275 and z < 0.07575
+        in6 = r < 0.00635 and z > 0.07575 and z < 0.0805
+        in7 = r < 0.0025 and z > 0.0805 and z < 0.081
+        in8 = r < 0.030 and z >= 0.081 and z < endPos
+        inside = in1 + in2 + in3 + in4 + in5 + in6 + in7 + in8
+        return inside
 
-    return inside
+    else:
+        raise ValueError('Could not find bounds for geometry {}'.format(form))
 
 def setAmbientFlow(x, y, z, form='box'):
     '''
@@ -199,7 +214,7 @@ def setAmbientFlow(x, y, z, form='box'):
         xFlow = x * radFlow / r * 100
         yFlow = y * radFlow / r * 100
         zFlow = 0.2 * 100
-    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
+    elif form in knownGeometries:
         xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
         if abs(xFlow) > 1000:
             print(x, y, z, xFlow, 'm/s')
@@ -212,7 +227,7 @@ def setAmbientDensity(x, y, z, form='box'):
     global n
     if form in ['box', 'curvedFlowBox', 'open']:
         n = n
-    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
+    elif form in knownGeometries:
         n = dsmcQuant(x, y, z, f1)
         if abs(n) > 1e26:
             print(x, y, z, n, 'm-3')
@@ -225,7 +240,7 @@ def setAmbientTemp(x, y, z, form='box'):
     global T
     if form in ['box', 'curvedFlowBox', 'open']:
         T = T
-    elif form in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
+    elif form in knownGeometries:
         T = dsmcQuant(x, y, z, f2)
         if abs(T) > 500:
             print(x, y, z, T, 'K')
@@ -295,7 +310,9 @@ def initial_species_position(L=0.01, form='', mode=0):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
-    if form not in ['fCell', 'gCell', 'hCell', 'jCell', 'kCell']:
+    global knownGeometries
+
+    if form not in knownGeometries:
         x = np.random.uniform(-L/2, L/2)
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
@@ -445,7 +462,7 @@ def showWalls():
 
     global geometry, INIT_MODE, PROBE_MODE
 
-    if geometry in ['hCell', 'jCell', 'kCell']:
+    if geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
         default_endPos = 0.24
     elif geometry in ['fCell', 'gCell']:
         default_endPos = 0.12
@@ -566,7 +583,7 @@ if __name__ == '__main__':
 
         if geometry in ['fCell', 'gCell']:
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
-        elif geometry in ['hCell', 'jCell', 'kCell']:
+        elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
         else:
             print('No geometry')
