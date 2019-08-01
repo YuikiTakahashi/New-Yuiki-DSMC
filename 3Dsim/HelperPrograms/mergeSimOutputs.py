@@ -3,11 +3,14 @@ import numpy as np
 import fileinput
 
 def count_particles(filename):
-    f = np.loadtxt(filename, skiprows=1)
-    num = 0 #number of simulated particles
-    for i in range(len(f)):
-        if not np.any(f[i]):
-            num += 1 # count number of particles simulated in file
+    try:
+        f = np.loadtxt(filename, skiprows=1)
+        num = 0 #number of simulated particles
+        for i in range(len(f)):
+            if not np.any(f[i]):
+                num += 1 # count number of particles simulated in file
+    except:
+        num=0
     return num
 
 
@@ -41,7 +44,7 @@ for f in INFILE_LIST:
     print("Particles in {0}: {1}".format(f, count_particles(DIRECTORY+'\\'+f)))
 
 if APPEND==False:
-    with open(OUTFILE_FULL, 'w') as fout, fileinput.input(INFILE_LIST_FULL) as fin:
+    with open(OUTFILE_FULL, 'w+') as fout, fileinput.input(INFILE_LIST_FULL) as fin:
         HEADER = False
         for line in fin:
             if HEADER==False and line[0]=='x':

@@ -18,19 +18,8 @@ NZ = 1000
 NR = 1000
 
 #This is for running on the cluster
-CLUSTER = False
+CLUSTER = True
 WRITE_FILE = "THERMALDATA.dat"
-
-if __name__ == '__main__':
-
-    if CLUSTER==True:
-        global directory
-        directory=''
-        
-        initialize()
-        main()
-        writeData(WRITE_FILE)
-
 
 def main():
     global f, numParticles, VR_LISTS, VZ_LISTS, V_LISTS
@@ -272,3 +261,13 @@ def rRegion(r, prev_k):
 
     #If we exit while loop
     raise ValueError('Overflowed delta', 'r: {}, prev_rk: {}'.format(r,prev_k))
+
+
+if __name__ == '__main__':
+
+    if CLUSTER==True:
+        directory=''
+
+        initialize()
+        main()
+        writeData(WRITE_FILE)
