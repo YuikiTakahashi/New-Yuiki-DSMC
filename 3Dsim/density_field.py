@@ -17,7 +17,7 @@ def main():
 
     parser = argparse.ArgumentParser('Simulation Specs')
     parser.add_argument('-ff', dest='ff', action='store') # Specify flowfield
-    parser.set_defaults(ff='F_Cell/DS2f005.DAT')
+    parser.set_defaults(ff='M_Cell/DS2m002.DAT')
     args = parser.parse_args()
     FF = args.ff
 
@@ -86,7 +86,7 @@ def set_field(FF):
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
 
-        elif FF[10] in ['h', 'j', 'k']:
+        elif FF[10] in ['h', 'j', 'k', 'm']:
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
 
