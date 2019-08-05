@@ -367,7 +367,7 @@ def initial_species_position(L=0.01, form='', mode=1):
 
         #Approximating ablation: 5mm width in the z direction, starting from the wall
         elif mode==2:
-            x, y = -0.00635, 0
+            x, y = -0.00635+0.0001, 0
             z = np.random.uniform(0.035,0.040)
 
         else:
