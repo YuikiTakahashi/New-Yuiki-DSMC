@@ -17,7 +17,7 @@ from multiprocessing import Pool
 import itertools
 import argparse
 import sys
-#import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from collections import defaultdict
 
 knownGeometries = ['fCell', 'gCell', 'hCell', 'jCell', 'kCell', 'mCell']
@@ -288,25 +288,41 @@ def getAmbientVelocity(precision=4, width=700, simple=True):
     z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
     return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
 
-def initial_species_velocity(T_s0):
+def initial_species_velocity(mode=1):
     '''
     Given species temperature, return randomized (Boltzmann) speed in a
     randomized (spherically uniform) direction.
     '''
     global T_s
+
+    #These initial conditions assume the molecules begin thermalized with the 4K environment
+    if mode in [0, 1, 9, 11]:
+        T_s0 = 4
+
+    #This initial condition is meant to approximate the post-ablation species
+    #velocity distribution
+    elif mode in [2]:
+        T_s0 = 5000
+
     T_s_holder = T_s
     T_s = T_s0
-    set_derived_quants()
+    set_derived_quants() #Required because species_vel_cv draws temperature directly from T_s
     v0 = species_vel_cv.rvs()
     T_s = T_s_holder # Return to thermalized value
     set_derived_quants()
-    theta = theta_cv.rvs()
-    phi = np.random.uniform(0, 2*np.pi)
-    Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                       *np.sin(phi), v0*np.cos(theta))
+
+    if mode in [0,1,9,11]:
+
+        theta = theta_cv.rvs()
+        phi = np.random.uniform(0, 2*np.pi)
+        Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                           *np.sin(phi), v0*np.cos(theta))
+    elif mode in [2]:
+        Vx, Vy, Vz = v0, 0, 0
+
     return Vx, Vy, Vz
 
-def initial_species_position(L=0.01, form='', mode=0):
+def initial_species_position(L=0.01, form='', mode=1):
     '''
     Return a random position in a cube of side length L around the origin.
     '''
@@ -316,6 +332,7 @@ def initial_species_position(L=0.01, form='', mode=0):
         x = np.random.uniform(-L/2, L/2)
         y = np.random.uniform(-L/2, L/2)
         z = np.random.uniform(-L/2, L/2)
+
     else:
         #Larger initial distribution of particles
         if mode==1:
@@ -348,6 +365,13 @@ def initial_species_position(L=0.01, form='', mode=0):
                 r = np.random.uniform(0,0.066-z)
             x, y = r * np.cos(ang), r * np.sin(ang)
 
+        #Approximating ablation: 5mm width in the z direction, starting from the wall
+        elif mode==2:
+            x, y = -0.00635, 0
+            z = np.random.uniform(0.035,0.040)
+
+        else:
+            raise ValueError('Did not recognize INIT_MODE {}'.format(mode))
 
     return x, y, z
 
@@ -404,7 +428,7 @@ def endPosition(extPos=0.12):
     traj = []
     np.random.seed()
     x, y, z = initial_species_position(L=.01, form=geometry, mode=INIT_MODE)
-    vx, vy, vz = initial_species_velocity(T_s0=4) #Thermalized to 4K environment
+    vx, vy, vz = initial_species_velocity(mode=INIT_MODE) #Thermalized to 4K environment
     sim_time = 0.0 #Tracking simulation time
 
     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
