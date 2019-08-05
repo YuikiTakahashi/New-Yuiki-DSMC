@@ -22,7 +22,8 @@ def showPlot(dotSize, cellGeometry):
                 'h5/Set3/probeResults.dat',\
                 'h5/Set4/probeResults.dat',\
                 'h5/Set5/probeResults.dat',\
-                'h5/Set6/probeResults.dat']
+                'h5/Set6/probeResults.dat',\
+                'h5/Set7/probeResults.dat',\]
 
 
     arrayDic = {}

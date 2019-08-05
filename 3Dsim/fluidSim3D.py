@@ -794,13 +794,15 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #This should be 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = {'f':120, 'g':120,\
-                      'h':240, 'j':240, 'k':240}[file_ext[0]]
+                      'h':240, 'j':240, 'k':240, 'm':240}[file_ext[0]]
 
-    #0.064 for f and g cell geometries, 0.06785 for h, j, k cells
-    DEFAULT_APERTURE = 0.06785
+    #0.064 for f and g cell geometries, 0.06785 for h, j, k cells. Only matters for print
+    #output, not for data analysis
+    DEFAULT_APERTURE = {'f':0.064, 'g':0.064,\
+                        'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785}[file_ext[0]]
 
     #64 mm for f/g, 67.85mm for h
-    z_center=67.85
+    z_center=1000*DEFAULT_APERTURE
     x_center=0
     y_center=0  #Coordinates of bowl center
 
@@ -834,7 +836,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                'ClusterLaval':'ClusterLaval/{}.dat',\
                'ClusterJCell':'ClusterJCell/{}.dat',\
                'ClusterKCell':'ClusterKCell/{}.dat',\
-             'InitLargeKCell':'InitLargeKCell/{}_init1.dat'\
+             'InitLargeKCell':'InitLargeKCell/{}_init1.dat',\
+             'ClusterMCell':'ClusterMCell/{}.dat'             
                 }
 
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
@@ -857,7 +860,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'h002':2, 'h005':5, 'h010':10, 'h020':20, 'h050':50, 'h100':100, 'h200':200,\
                 'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200,\
                 'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200,\
-                'k002':2, 'k005':5, 'k010':10, 'k020':20, 'k050':50, 'k100':100, 'k200':200}[file_ext]
+                'k002':2, 'k005':5, 'k010':10, 'k020':20, 'k050':50, 'k100':100, 'k200':200,\
+                'm002':2, 'm005':5, 'm010':10, 'm020':20, 'm050':50, 'm100':100, 'm200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1171,7 +1175,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #     tc.close()
 
     if write == 1 and rad_mode==True:
-        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(write_file), 'a') as tc:
+        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+write_file), 'a') as tc:
             tc.write('  '.join(map(str, [dome_rad0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
@@ -1181,7 +1185,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #These two are identical except for reporting the dome radius (dome_rad0) versus the plane distance (pos0)
     elif write == 1 and rad_mode==False:
-        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(write_file), 'a') as tc:
+        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+write_file), 'a') as tc:
             tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
@@ -1194,7 +1198,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 # best to keep each data file with the same plane position i.e. keep only a single
 # value for the zs
 # =============================================================================
-def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
+def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, windowMode=False, header=True):
     '''
     Iterate through each of the flowrates, for a given geometry, and either write
     the output from analyzeTrajData to a file, or plot the analysis from the file,
@@ -1202,14 +1206,22 @@ def multiFlowAnalyzePlane(file, plane=0.064, write=False, plot=False):
     '''
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
-#    fileList = ['g002','g005','g010','g020','g050','g100','g200']
-    fileList = ['f002', 'f005', 'f010', 'f020', 'f050', 'f100', 'f200']
 
-    folder = 'InitLarge'
+    geom='m'
+    fileList = ['002', '010', '020', '050']
+
+#    folder = 'InitLarge'
 
     if write==True:
+        
+        if header:
+            with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+file), 'a+') as tc:
+                tc.write("PlaneZ FR   Gamma  Ext    sigE   vR     sigvR vZ      sigvZ   Sprd    theta   sigTh time   sigT   Reyn  SprdB   MedRad(mm)\n")
+            tc.close()
+        
         for f in fileList:
-            analyzeTrajData(f, folder, file, pos=plane, write=True, rad_mode=False)
+            analyzeTrajData(geom+f, folder, file, pos=plane, window=windowMode, write=True, rad_mode=False)
+
 
     if plot == True:
 
@@ -1350,23 +1362,32 @@ def series_multirate_plots(plane=0.064):
 #############################################################
 
     dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
-             'BevelGeometry/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
-              'ClusterLaval/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
+                     'GCell/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
+              'ClusterHCell/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
                  'ClusterJCell/plane94.dat' : (0, 'de Laval', 'o', ':') ,\
                  'ClusterKCell/plane94.dat' : (0, 'de Laval III (K)', 'o', ':'),\
 
 
                'TimeColumn/window94_mr.dat' : (0, 'Straight Hole', 'o', '--'),\
-            'BevelGeometry/window94_mr.dat' : (0, 'Beveled Aperture', 'o', '--'),\
-             'ClusterLaval/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
+                    'GCell/window94_mr.dat' : (0, 'Beveled Aperture', 'o', '--'),\
+             'ClusterHCell/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
                 
                 'InitLarge/window94_mr.dat' : (0, 'Straight (i-1)', 'o', '--'),\
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
               
-                 'InitLarge/plane94_mr.dat' : (1, 'Straight (i-1)', 'o', '--'),\
-               'InitLargeKCell/plane94.dat' : (1, 'de Laval K (i-1)', 'o', '--'),\
+                 'InitLarge/plane94_mr.dat' : (0, 'Straight 94 (i-1)', 'o', '--'),\
+               'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
+               
+                   'InitLarge/plane111.dat' : (1, 'Straight (I1)', 'o', '--'),\
+              'InitLargeKCell/plane111.dat' : (1, 'de Laval K (I1)', 'o', '--'),\
+                'ClusterMCell/plane111.dat' : (1, 'Slowing Cell (I1)','o', '--'),\
+                
+                  'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
+             'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
+               'ClusterMCell/window111.dat' : (0, 'Slowing Cell (I1)','o', '--')
+                
                 
                 
              }
@@ -1435,7 +1456,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    howMany = 7
+    howMany = 5
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()

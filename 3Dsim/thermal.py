@@ -18,7 +18,7 @@ NZ = 1000
 NR = 1000
 
 #This is for running on the cluster
-CLUSTER = True
+CLUSTER = False
 WRITE_FILE = "THERMALDATA.dat"
 
 def main():
@@ -164,7 +164,25 @@ def showPlots(which):
     arr = {'vr':VRDATA, 'vz':VZDATA, 'v':VDATA}[which]
     img = plt.imshow(arr)
     plt.show()
+    
 
+def plotFromFile(filename, quant):
+    
+    print("Reading file {} ...".format(filename))
+    f = np.loadtxt(directory+filename,skiprows=1)
+    whichCol = {'vr':2, 'vz':3, 'v':4}[quant]
+    print(whichCol)
+    
+    arr = np.ones((NZ,NR))
+    
+    print("Preparing array ...")
+    for i in range(len(f)):
+        z, r = int(f[i,0]), int(f[i,1])
+        arr[z][r] = f[i, whichCol]
+    
+    plt.imshow(np.transpose(arr), origin='lower')
+#    plt.axis([15,120,0,30])
+    plt.show()
 # =============================================================================
 # Initializing data matrix, velocity maps and z/r axes
 # =============================================================================

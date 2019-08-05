@@ -174,6 +174,7 @@ def plot_dens(x0=0, y0=0, z0=0.010, zf=0.15, array_size = 100, which_flow='f005'
 
     plt.xlabel('Z distance (m)')
     plt.axvline(x=0.064)
+    plt.axvline(x=0.081)
     plt.show()
 
 
@@ -351,10 +352,11 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     legends={}
     for flow in flowList:
         if flow not in legends:
-#            flowtype = {'f': 'Straight hole, ',\
-#                        'g': 'Bevel hole, ',\
-#                        'h': 'de Laval, '}[flow[0]]
-            flowtype=''
+            flowtype = {'f': 'Straight ',\
+                        'g': 'Bevel hole, ',\
+                        'h': 'de Laval, ',\
+                        'm': 'Slowing Cell '}[flow[0]]
+#            flowtype=''
             flowrate = str(int(flow[1:4]))+' SCCM'
             legends.update( {flow : flowtype+flowrate})
 
@@ -375,8 +377,8 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
 
     plt.xlabel('Z distance (m)')
     plt.legend()
-    #plt.axvline(x=0.064)
-    plt.axvline(x=0.098)
+    plt.axvline(x=0.064)
+    plt.axvline(x=0.081)
     plt.show()
 
 
@@ -385,6 +387,8 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
 # =============================================================================
 def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, plot=0):
     '''
+    Data default stored in Box: /Woolls_BG_Sims/BGWindow
+    
     Returns statistics on vz, FWHM vz, angular spread, etc for a specified
     BG flow field, on a small window of radius WINDOW_RAD about the z-axis.
     
