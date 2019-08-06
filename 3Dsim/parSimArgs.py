@@ -64,6 +64,8 @@ def get_flow_chars(filename):
     if filename[13:16] == "DS2":
         geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell"}[filename[16]]
         flowrate = int(filename[17:20])
+
+
     else:
         raise ValueError('Could not recognize the DS2 flow file')
     print(geometry)
@@ -421,7 +423,7 @@ def endPosition(extPos=0.12):
 
 
     #Important: need to properly retrieve geometry
-    global vx, vy, vz, LITE_MODE, geometry, INIT_MODE, PROBE_MODE
+    global vx, vy, vz, LITE_MODE, geometry, INIT_MODE, PROBE_MODE, default_aperture
 
     print("Running, INIT = {}".format(INIT_MODE))
 
@@ -444,7 +446,7 @@ def endPosition(extPos=0.12):
 
             #Print the full trajectory ONLY if 1) LITE_MODE=False, so we want all data,
             #or if 2) we are close enough to the aperture that we want to track regardless
-            if (LITE_MODE == False or z > 0.062) and PROBE_MODE == False:
+            if (LITE_MODE == False or z > default_aperture - 0.002) and PROBE_MODE == False:
                     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                                 round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
 
@@ -484,12 +486,17 @@ def showWalls():
 
     f = open(outfile, "w+")
 
-    global geometry, INIT_MODE, PROBE_MODE
+    global geometry, INIT_MODE, PROBE_MODE, default_aperture
 
-    if geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
+    if geometry in ['hCell', 'jCell', 'kCell']:
         default_endPos = 0.24
+        default_aperture = 0.064
+    elif geometry in ['mCell']:
+        default_endPos = 0.24
+        default_aperture = 0.0726
     elif geometry in ['fCell', 'gCell']:
         default_endPos = 0.12
+        default_aperture = 0.064
     else:
         print("Failed: Did not recognize geometry")
         sys.exit()
@@ -594,7 +601,7 @@ if __name__ == '__main__':
     try:
         flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
         get_flow_chars(FF)
-        global geometry, flowrate
+        global geometry, flowrate, default_aperture
         #geometry = 'fCell'
         #flowrate = int(FF[-7:-4])
         print("Loading flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
