@@ -23,7 +23,7 @@ def showPlot(dotSize, cellGeometry):
                 'h5/Set4/probeResults.dat',\
                 'h5/Set5/probeResults.dat',\
                 'h5/Set6/probeResults.dat',\
-                'h5/Set7/probeResults.dat',\]
+                'h5/Set7/probeResults.dat']
 
 
     arrayDic = {}
@@ -91,7 +91,7 @@ def analyzeFiles(directory, OUTFILE, READFILE, write):
     try:
         outf = np.loadtxt(directory+'\\'+OUTFILE, skiprows=1)
         print("{0} particles recorded in {1}".format(len(outf), OUTFILE) )
-    except StopIteration:
+    except:
         print("0 particles in {0}".format(OUTFILE))
 
     num_adding = count_particles(directory+'\\'+READFILE)
@@ -126,7 +126,7 @@ def analyzeFiles(directory, OUTFILE, READFILE, write):
                 print('')
 
     if write==True:
-        with open(directory+'\\'+OUTFILE,'a') as tc:
+        with open(directory+'\\'+OUTFILE,'a+') as tc:
             tc.write(''.join(map(str,list(results))))
 
     print("{0} made it, {1} did not".format(numYes, numNo))

@@ -376,9 +376,9 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
         plt.ylabel(title)
 
     plt.xlabel('Z distance (m)')
-    plt.legend()
     plt.axvline(x=0.064)
     plt.axvline(x=0.081)
+    plt.legend()
     plt.show()
 
 
