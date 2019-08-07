@@ -20,7 +20,23 @@ import sys
 # import matplotlib.pyplot as plt
 from collections import defaultdict
 
-knownGeometries = ['fCell', 'gCell', 'hCell', 'jCell', 'kCell', 'mCell']
+#Label all known geometries and map to a tuple (default_aperture, default_endPos)
+#  1. default_aperture: gives the z position (mm) of what we take to be the aperture \
+#                       in this geometry, used to tell when to start recording the
+#                       particle location when LITE_MODE is true
+#  2. default_endPos: gives the z position (mm) of the "end" point of the simulation
+#                       site, i.e. where to stop the computation if the molecule gets there.
+
+knownGeometries = {\
+                   'fCell' : (0.064, 0.12),\
+                   'gCell' : (0.064, 0.12),\
+                   'hCell' : (0.064, 0.24),\
+                   'jCell' : (0.064, 0.24),\
+                   'kCell' : (0.064, 0.24),\
+                   'mCell' : (0.081, 0.24),\
+                   'nCell' : (0.0726, 0.2),\
+                   'pCell' : (0.0726, 0.2)\
+                   }
 
 
 class CallBack(object):
@@ -62,7 +78,7 @@ def get_flow_chars(filename):
 
     #e.g. filename = flows/G_Cell/DS2g020
     if filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell"}[filename[16]]
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell", 'n':"nCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
 
@@ -137,11 +153,12 @@ def inBounds(x, y, z, form='box', endPos=0.12):
     Return Boolean value for whether or not a position is within
     the boundary of "form".
     '''
+    r = np.sqrt(x**2+y**2)
+
     if form in ['box', 'curvedFlowBox']:
         inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
 
     elif form == 'fCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in3 = r < 0.030 and z >= 0.0640 and z < endPos
@@ -149,7 +166,6 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         return inside
 
     elif form == 'gCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.05965
         in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
@@ -158,7 +174,6 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         return inside
 
     elif form == 'hCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.05965
         in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
@@ -167,7 +182,6 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         inside = in1 + in2 + in3 + in4 + in5
 
     elif form == 'jCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.05965
         in2 = r < 0.066-z and z > 0.05965 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
@@ -177,7 +191,6 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         return inside
 
     elif form == 'kCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.0624
         in2 = r < (38.5/11)*(0.0624-z)+0.00635 and z > 0.0624 and z < 0.0635
         in3 = r < 0.0025 and z > 0.0635 and z < 0.0640
@@ -187,7 +200,6 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         return inside
 
     elif form == 'mCell':
-        r = np.sqrt(x**2+y**2)
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in3 = r < 0.009 and z > 0.064 and z < 0.068
@@ -196,6 +208,18 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in6 = r < 0.00635 and z > 0.07575 and z < 0.0805
         in7 = r < 0.0025 and z > 0.0805 and z < 0.081
         in8 = r < 0.030 and z >= 0.081 and z < endPos
+        inside = in1 + in2 + in3 + in4 + in5 + in6 + in7 + in8
+        return inside
+
+    elif form == 'nCell':
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in3 = r < 0.009 and z > 0.064 and z < 0.067
+        in4 = r < 0.00635 and z > 0.067 and z < 0.0685
+        in5 = r < 0.009 and z > 0.0685 and z < 0.0706
+        in6 = r < 0.00635 and z > 0.0706 and z < 0.0721
+        in7 = r < 0.0025 and z > 0.0721 and z < 0.0726
+        in8 = r < 0.030 and z > 0.0726 and z < endPos
         inside = in1 + in2 + in3 + in4 + in5 + in6 + in7 + in8
         return inside
 
@@ -446,7 +470,7 @@ def endPosition(extPos=0.12):
 
             #Print the full trajectory ONLY if 1) LITE_MODE=False, so we want all data,
             #or if 2) we are close enough to the aperture that we want to track regardless
-            if (LITE_MODE == False or z > default_aperture - 0.002) and PROBE_MODE == False:
+            if (LITE_MODE == False or z > default_aperture - 0.0005) and PROBE_MODE == False:
                     traj.append(' '.join(map(str, [round(1000*x,3), round(1000*y,3), round(1000*z,2), \
                                                 round(vx,2), round(vy,2), round(vz,2), round(1000*sim_time, 4) ] ) )+'\n')
 
@@ -488,15 +512,26 @@ def showWalls():
 
     global geometry, INIT_MODE, PROBE_MODE, default_aperture
 
-    if geometry in ['hCell', 'jCell', 'kCell']:
-        default_endPos = 0.24
-        default_aperture = 0.064
-    elif geometry in ['mCell']:
-        default_endPos = 0.24
-        default_aperture = 0.0726
-    elif geometry in ['fCell', 'gCell']:
-        default_endPos = 0.12
-        default_aperture = 0.064
+    if geometry in knownGeometries:
+        default_aperture = knownGeometries[geometry][0]
+        default_endPos = knownGeometries[geometry][1]
+
+    # if geometry in ['fCell', 'gCell']:
+    #     default_endPos = 0.12
+    #     default_aperture = 0.064
+    #
+    # elif geometry in ['hCell', 'jCell', 'kCell']:
+    #     default_endPos = 0.24
+    #     default_aperture = 0.064
+    #
+    # elif geometry in ['mCell']:
+    #     default_endPos = 0.24
+    #     default_aperture = 0.0726
+    #
+    # elif geometry in ['nCell']:
+    #     default_endPos = 0.20
+    #     default_aperture
+
     else:
         print("Failed: Did not recognize geometry")
         sys.exit()
@@ -616,6 +651,8 @@ if __name__ == '__main__':
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
+        elif geometry in ['nCell']:
+            grid_x, grid_y = np.mgrid[0.010:0.20:9400j, 0:0.030:1500j] # high density, to be safe.
         else:
             print('No geometry')
             sys.exit()
