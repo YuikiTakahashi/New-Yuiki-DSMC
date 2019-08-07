@@ -78,7 +78,7 @@ def get_flow_chars(filename):
 
     #e.g. filename = flows/G_Cell/DS2g020
     if filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell", 'n':"nCell"}[filename[16]]
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
 
@@ -219,9 +219,17 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in5 = r < 0.009 and z > 0.0685 and z < 0.0706
         in6 = r < 0.00635 and z > 0.0706 and z < 0.0721
         in7 = r < 0.0025 and z > 0.0721 and z < 0.0726
-        in8 = r < 0.030 and z > 0.0726 and z < endPos
+        in8 = r < 0.030 and z >= 0.0726 and z < endPos
         inside = in1 + in2 + in3 + in4 + in5 + in6 + in7 + in8
         return inside
+
+    elif form == 'pCell':
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in3 = r < 0.009 and z > 0.064 and z < 0.067
+        in4 = r < 0.00635 and z > 0.0721 and z < 0.0726
+        in5 = r < 0.0025 and z > 0.0721 and z < 0.0726
+        in6 = r < 0.030 and z >= 0.0726 and z < endPos
 
     else:
         raise ValueError('Could not find bounds for geometry {}'.format(form))
@@ -647,11 +655,11 @@ if __name__ == '__main__':
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
         #print("2")
 
-        if geometry in ['fCell', 'gCell']:
+        if geometry in ['fCell', 'gCell', 'nCell']:
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
-        elif geometry in ['nCell']:
+        elif geometry in ['pCell']:
             grid_x, grid_y = np.mgrid[0.010:0.20:9400j, 0:0.030:1500j] # high density, to be safe.
         else:
             print('No geometry')
