@@ -82,14 +82,17 @@ def set_field(FF):
         print("Block 1: density and temperature")
 
         #Recall FF e.g.= F_Cell/DS2f200.DAT or G_Cell/DS2g005.DAT
-        if FF[10] in ['f', 'g']:
+        if FF[10] in ['f', 'g', 'n']:
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
 
         elif FF[10] in ['h', 'j', 'k', 'm']:
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
-
+        
+        elif FF[10] in ['p']:
+            print('{} geometry grid'.format(FF[10]))
+            grid_x, grid_y = np.mgrid[0.010:0.20:9400j, 0:0.030:1500j]
 
         grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
         grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
