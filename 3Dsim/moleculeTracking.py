@@ -1,15 +1,15 @@
 import numpy as np
 
-#directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/'
-#file_ext = 'traj017d.dat'
-
-directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
-infile = 'f100_th.dat'
-outfile = 'moleculeTracking_f100.dat'
+directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/WoollsData/'
+infile = 'f002_10par.dat'
+outfile = 'moleculeTracking_f00210.dat'
+#directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
+#infile = 'f100_th.dat'
+#outfile = 'moleculeTracking_f100.dat'
 
 #This is for running on the cluster
-CLUSTER = False
-VERBOSE = False
+CLUSTER = 0
+VERBOSE = 1
 
 NUM_FRAMES = 10
 
@@ -39,7 +39,8 @@ def main():
                 #Fill the rest of the time frames with the particle's last location
                 molPositions.update( {T_K : molPositions[T_K] + [ (r, z) ] } )
                 k_frame += 1
-                T_K = frameTimes[k_frame]
+                if k_frame < NUM_FRAMES:
+                        T_K = frameTimes[k_frame]
 
             currentParticle += 1
             print("Particle {} of {}".format(currentParticle, numParticles))
@@ -50,22 +51,29 @@ def main():
         else:
             x, y, z, vx, vy, vz, tim = f[i]
             r = np.sqrt(x**2+y**2)
-
+            
+            
             while tim >= T_K:
-
+                if VERBOSE:
+                    print("t = {}, T_K = {}".format(tim, T_K))
+            
                 if tim == T_K:
 
                     molPositions.update( {T_K : molPositions[T_K] + [ (r, z) ] } )
                     k_frame += 1
-                    T_K = frameTimes[k_frame]
+                    if k_frame < NUM_FRAMES:
+                        T_K = frameTimes[k_frame]
 
                 elif tim > T_K:
                     zk, rk = get_position(x1=x, y1=y, z1=z, t1=tim, vx=prev_vx, vy=prev_vy, vz=prev_vz, t0=T_K)
 
                     molPositions.update( {T_K : molPositions[T_K] + [ (rk, zk) ] } )
                     k_frame += 1
-                    T_K = frameTimes[k_frame]
-
+                    if k_frame < NUM_FRAMES:
+                        T_K = frameTimes[k_frame]
+                
+                if k_frame == NUM_FRAMES:
+                    break
             #Once the recording-frame time has caught up to the particle simulation time,
             #save previous velocities and move on to the next line in the file
             prev_vx, prev_vy, prev_vz = vx, vy, vz
@@ -84,18 +92,18 @@ def get_position(x1, y1, z1, t1, vx, vy, vz, t0):
     z0 = z1 - vz*delta_t
 
     return z0, np.sqrt(x0**2+y0**2)
-    
+
 
 # =============================================================================
 # Taking map molPositions and writing time frames into a file
 # =============================================================================
-def writeData(filepath):
+def writeData():
     '''
     Writes data matrix from molPositions to a file.
     '''
     global frameTimes, molPositions, numParticles
 
-    with open(filepath, 'a+') as tw:
+    with open(directory+outfile, 'a+') as tw:
         tw.write('R   Z   TK  \n')
 
         for t in frameTimes:
@@ -157,7 +165,6 @@ def get_data(filepath):
     print("Max time is {}".format(MAX_TIME))
 
 
-
 def make_structures():
     '''
     Need to run get_data() first to know MAX_TIME.
@@ -183,4 +190,4 @@ if __name__ == '__main__':
 
         initialize()
         main()
-        writeData(directory+outfile)
+        writeData()

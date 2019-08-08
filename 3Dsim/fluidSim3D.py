@@ -837,7 +837,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                'ClusterJCell':'ClusterJCell/{}.dat',\
                'ClusterKCell':'ClusterKCell/{}.dat',\
              'InitLargeKCell':'InitLargeKCell/{}_init1.dat',\
-             'ClusterMCell':'ClusterMCell/{}.dat'             
+               'ClusterMCell':'ClusterMCell/{}.dat',\
+             'InitAblatFCell':'InitAblatFCell/{}.dat'
                 }
 
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
@@ -1207,8 +1208,8 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
-    geom='m'
-    fileList = ['002', '010', '020', '050']
+    geom='f'
+    fileList = ['002', '005', '010', '020', '050']
 
 #    folder = 'InitLarge'
 
@@ -1361,7 +1362,7 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
+    dataSets = {'TimeColumn/plane94_mr.dat' : (1, 'Straight Hole', 'o', '--') ,\
                      'GCell/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
               'ClusterHCell/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
                  'ClusterJCell/plane94.dat' : (0, 'de Laval', 'o', ':') ,\
@@ -1377,16 +1378,22 @@ def series_multirate_plots(plane=0.064):
                 'InitLarge/window94_mr.dat' : (0, 'Straight (i-1)', 'o', '--'),\
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
               
-                 'InitLarge/plane94_mr.dat' : (0, 'Straight 94 (i-1)', 'o', '--'),\
+                 'InitLarge/plane94_mr.dat' : (1, 'Straight 94 (i-1)', 'o', '--'),\
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
                
-                   'InitLarge/plane111.dat' : (1, 'Straight (I1)', 'o', '--'),\
-              'InitLargeKCell/plane111.dat' : (1, 'de Laval K (I1)', 'o', '--'),\
-                'ClusterMCell/plane111.dat' : (1, 'Slowing Cell (I1)','o', '--'),\
-                
+                   'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
+              'InitLargeKCell/plane111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
+                'ClusterMCell/plane111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
+            
                   'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
              'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
-               'ClusterMCell/window111.dat' : (0, 'Slowing Cell (I1)','o', '--')
+               'ClusterMCell/window111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
+               
+              'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
+               'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
+                'InitLarge/aperture_mr.dat' : (0, 'Normal', 'o', '--'),
+              'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
+               'InitAblatFCell/plane94.dat' : (1, 'Ablation', 'o', '--'),\
                 
                 
                 
