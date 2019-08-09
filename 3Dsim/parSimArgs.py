@@ -226,11 +226,12 @@ def inBounds(x, y, z, form='box', endPos=0.12):
     elif form == 'pCell':
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
-        in3 = r < 0.009 and z > 0.064 and z < 0.067
-        in4 = r < 0.00635 and z > 0.0721 and z < 0.0726
+        in3 = r < 0.009 and z > 0.0640 and z < 0.067
+        in4 = r < 0.00635 and z > 0.067 and z < 0.0721
         in5 = r < 0.0025 and z > 0.0721 and z < 0.0726
         in6 = r < 0.030 and z >= 0.0726 and z < endPos
-
+        inside = in1 + in2 + in3 + in4 + in5 + in6
+        return inside
     else:
         raise ValueError('Could not find bounds for geometry {}'.format(form))
 
@@ -524,27 +525,9 @@ def showWalls():
         default_aperture = knownGeometries[geometry][0]
         default_endPos = knownGeometries[geometry][1]
 
-    # if geometry in ['fCell', 'gCell']:
-    #     default_endPos = 0.12
-    #     default_aperture = 0.064
-    #
-    # elif geometry in ['hCell', 'jCell', 'kCell']:
-    #     default_endPos = 0.24
-    #     default_aperture = 0.064
-    #
-    # elif geometry in ['mCell']:
-    #     default_endPos = 0.24
-    #     default_aperture = 0.0726
-    #
-    # elif geometry in ['nCell']:
-    #     default_endPos = 0.20
-    #     default_aperture
-
     else:
         print("Failed: Did not recognize geometry")
         sys.exit()
-
-    #plot_boundaries(endPoint=default_endPos)
 
     #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
     inputs = np.ones(PARTICLE_NUMBER) * default_endPos
@@ -644,7 +627,9 @@ if __name__ == '__main__':
     try:
         flowField = np.loadtxt(FF, skiprows=1) # Assumes only first row isn't data.
         get_flow_chars(FF)
+        # plot_boundaries(endPoint=0.2)
         global geometry, flowrate, default_aperture
+
         #geometry = 'fCell'
         #flowrate = int(FF[-7:-4])
         print("Loading flow field: geometry {0}, flowrate = {1} SCCM".format(geometry,flowrate))
