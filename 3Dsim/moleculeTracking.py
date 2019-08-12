@@ -1,20 +1,20 @@
 import numpy as np
 
-directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/WoollsData/'
-infile = 'f002_10par.dat'
-outfile = 'moleculeTracking_f00210.dat'
-#directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
-#infile = 'f100_th.dat'
-#outfile = 'moleculeTracking_f100.dat'
+# directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/WoollsData/'
+# infile = 'f100_c1.dat'
+# outfile = 'molTr_f100_150_75frames.dat'
+directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/f100_batch3/"
+infile = 'f100_c2.dat'
+outfile = 'mT_f100_75fr_c2.dat'
 
 #This is for running on the cluster
 CLUSTER = 0
-VERBOSE = 1
+VERBOSE = 0
 
-NUM_FRAMES = 10
+NUM_FRAMES = 75
 
 
-def main():
+def main(verb=VERBOSE):
     global f, numParticles, frameTimes, molPositions
 
     currentParticle = 0
@@ -26,7 +26,10 @@ def main():
 
     for i in range(len(f)):
 
-        if VERBOSE:
+        if round(100*i/len(f),5)%5 == 0:
+                print("Line {0} of {1}: {2}% done".format(i, len(f),round(100*i/len(f),2)))
+
+        if verb:
             print("\nLine {0}, ".format(i))
 
         if not np.any(f[i]):
@@ -51,12 +54,15 @@ def main():
         else:
             x, y, z, vx, vy, vz, tim = f[i]
             r = np.sqrt(x**2+y**2)
-            
-            
+
+
             while tim >= T_K:
-                if VERBOSE:
-                    print("t = {}, T_K = {}".format(tim, T_K))
-            
+                if verb:
+                    print("t = {}, T_K = {}, k={}".format(tim, T_K, k_frame))
+
+                if k_frame == NUM_FRAMES:
+                    break
+
                 if tim == T_K:
 
                     molPositions.update( {T_K : molPositions[T_K] + [ (r, z) ] } )
@@ -71,9 +77,7 @@ def main():
                     k_frame += 1
                     if k_frame < NUM_FRAMES:
                         T_K = frameTimes[k_frame]
-                
-                if k_frame == NUM_FRAMES:
-                    break
+
             #Once the recording-frame time has caught up to the particle simulation time,
             #save previous velocities and move on to the next line in the file
             prev_vx, prev_vy, prev_vz = vx, vy, vz
