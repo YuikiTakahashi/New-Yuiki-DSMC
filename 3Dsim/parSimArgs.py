@@ -38,6 +38,8 @@ knownGeometries = {\
                    'pCell' : (0.0726, 0.2)\
                    }
 
+collProb = 0.1 #Probability of collision, set at 1/10
+
 
 class CallBack(object):
     completed = defaultdict(int)
@@ -62,8 +64,8 @@ def set_derived_quants():
     vMean = 2 * (2 * kb * T / (m * np.pi))**0.5
     vMeanM = 2 * (2 * kb * T_s / (M * np.pi))**0.5
     coll_freq = n * cross * vMean # vRel
-    if 0.1 / coll_freq < 1e-4:
-        dt = 0.1 / coll_freq # ∆t satisfying E[# collisions in 100∆t] = 1.
+    if collProb / coll_freq < 1e-4:
+        dt = collProb / coll_freq # ∆t satisfying E[# collisions in 10∆t] = 1.
         no_collide = False
     else: # Density is so low that collision frequency is near 0
         no_collide = True # Just don't collide.
@@ -473,7 +475,7 @@ def endPosition(extPos=0.12):
     while inBounds(x, y, z, geometry, extPos):
         # Typically takes few ms to leave box
         updateParams(x, y, z, geometry)
-        if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
+        if np.random.uniform() < collProb and no_collide==False: # 1/10 chance of collision
 
             collide()
 
