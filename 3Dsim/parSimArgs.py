@@ -34,7 +34,7 @@ knownGeometries = {\
                    'jCell' : (0.064, 0.24),\
                    'kCell' : (0.064, 0.24),\
                    'mCell' : (0.081, 0.24),\
-                   'nCell' : (0.0726, 0.12),\
+                   'nCell' : (0.073, 0.14),\
                    'pCell' : (0.0726, 0.2)\
                    }
 
@@ -216,12 +216,12 @@ def inBounds(x, y, z, form='box', endPos=0.12):
     elif form == 'nCell':
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
-        in3 = r < 0.009 and z > 0.064 and z < 0.067
-        in4 = r < 0.00635 and z > 0.067 and z < 0.0685
-        in5 = r < 0.009 and z > 0.0685 and z < 0.0706
-        in6 = r < 0.00635 and z > 0.0706 and z < 0.0721
-        in7 = r < 0.0025 and z > 0.0721 and z < 0.0726
-        in8 = r < 0.030 and z >= 0.0726 and z < endPos
+        in3 = r < 0.009 and z > 0.064 and z < 0.066
+        in4 = r < 0.00635 and z > 0.066 and z < 0.068
+        in5 = r < 0.009 and z > 0.068 and z < 0.070
+        in6 = r < 0.00635 and z > 0.070 and z < 0.072
+        in7 = r < 0.0025 and z > 0.072 and z < 0.073
+        in8 = r < 0.030 and z >= 0.073 and z < endPos
         inside = in1 + in2 + in3 + in4 + in5 + in6 + in7 + in8
         return inside
 
@@ -355,7 +355,7 @@ def initial_species_velocity(mode=1):
         Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
                            *np.sin(phi), v0*np.cos(theta))
     elif mode in [2]:
-        
+
         Vx, Vy, Vz = v0, 0, 0
 
     return Vx, Vy, Vz
