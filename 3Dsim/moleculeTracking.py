@@ -3,9 +3,10 @@ import numpy as np
 # directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/WoollsData/'
 # infile = 'f100_c1.dat'
 # outfile = 'molTr_f100_150_75frames.dat'
-directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/f100_batch3/"
-infile = 'f100_c2.dat'
-outfile = 'mT_f100_75fr_c2.dat'
+directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
+outdirectory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/Animation/"
+infile = 'f100_th.dat'
+outfile = 'mT_f100_75fr_th.dat'
 
 #This is for running on the cluster
 CLUSTER = 0
@@ -107,7 +108,7 @@ def writeData():
     '''
     global frameTimes, molPositions, numParticles
 
-    with open(directory+outfile, 'a+') as tw:
+    with open(outdirectory+outfile, 'a+') as tw:
         tw.write('R   Z   TK  \n')
 
         for t in frameTimes:
@@ -191,6 +192,7 @@ if __name__ == '__main__':
 
     if CLUSTER==True:
         directory=''
+        outdirectory=''
 
         initialize()
         main()

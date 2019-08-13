@@ -9,18 +9,20 @@ import argparse
 #matplotlib.use("Agg")
 #plt.rcParams['animation.ffmpeg_path'] = 'usr/bin/ffmpeg'
 #FFwriter = animation.FFMpegWriter()
-directory = "C:\\Users\\gabri\\Desktop\\HutzlerSims\\Gas-Simulation\\3Dsim\\Data\\WoollsData\\"
-infile = 'molTr_f100_150_75frames.dat'
+directory = "C:\\Users\\gabri\\Box\\HutzlerLab\\Data\\Woolls_BG_Sims\\Animation\\"
+infile = 'mT_f100_75fr_th.dat'
 outfile = 'f100_movie.mp4'
 
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=15, metadata=dict(artist='Me'),bitrate=1800)
 colorMap = 'plasma'
 lineWidth = 1.0
 
-interval_input = 350 #sets speed (frame rate?) of animation
+interval_input = 250 #sets speed (frame rate?) of animation
 nbins = 100
 
 DEBUG = 0
-SAVE=0  #should we save the animation
+SAVE=1  #should we save the animation
 PLAY =1
 
 #f is an Nx3 matrix where the columns are z, r, t
@@ -70,9 +72,6 @@ def animate(i):
 
 
 #
-
-if SAVE:
-    anim.save(savefile)
 
 # animate(0)
 # plt.show()
@@ -137,4 +136,9 @@ if PLAY:
     im = ax.imshow(counts.T, origin='lower',extent=[0,120,0,30], aspect='auto', interpolation='gaussian', cmap=colorMap)
 
     anim = animation.FuncAnimation(fig, animate, frames=np.size(times), interval=interval_input, blit=False)
+
+    if SAVE:
+        anim.save(directory+outfile,writer=writer)
+
+
     plt.show()
