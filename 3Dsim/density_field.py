@@ -17,7 +17,7 @@ def main():
 
     parser = argparse.ArgumentParser('Simulation Specs')
     parser.add_argument('-ff', dest='ff', action='store') # Specify flowfield
-    parser.set_defaults(ff='M_Cell/DS2m002.DAT')
+    parser.set_defaults(ff='K_Cell/DS2k005.DAT')
     args = parser.parse_args()
     FF = args.ff
 
@@ -35,9 +35,11 @@ def main():
     plot_dens()
 
 def set_many():
-    flist = ['010','020','050','100','002','005','200']
+    flist = ['002','005','010','020','050','100','200']
     for f in flist:
-        set_params(FF='H_Cell/DS2h{}.DAT'.format(f))
+        set_params(FF='K_Cell/DS2k{}.DAT'.format(f))
+#        set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
+#        set_params(FF='K_Cell/DS2k{}.DAT'.format(f))
 
 def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
@@ -358,7 +360,7 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
             flowtype = {'f': 'Straight ',\
                         'g': 'Bevel hole, ',\
                         'h': 'de Laval, ',\
-                        'm': 'Slowing Cell '}[flow[0]]
+                        'p': 'Slowing Cell '}[flow[0]]
 #            flowtype=''
             flowrate = str(int(flow[1:4]))+' SCCM'
             legends.update( {flow : flowtype+flowrate})
@@ -400,28 +402,29 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
     plot = 0: Plots velocities vs radius only for (which_flow)
        write = 1: Writes statistics of (which_flow) to a row in (file)
     '''
-    WINDOW_RAD=0.03
+#    WINDOW_RAD=0.03
+    WINDOW_RAD = 0.002
     ARRAY_SIZE = 2000
 
     logscale=0
 
 #    fileList = ['Fcell.dat', 'Gcell.dat', 'Hcell.dat']
-    fileList = ['Fcell_plane.dat', 'Gcell_plane.dat', 'Hcell_plane.dat', 'Jcell_plane.dat']
+#    fileList = ['Fcell_plane.dat', 'Gcell_plane.dat', 'Hcell_plane.dat', 'Jcell_plane.dat']
+    fileList = ['Fcell.dat','Kcell.dat', 'Pcell.dat']
+    legends = {fileList[0] : 'Straight',\
+               fileList[1] : 'de Laval-K',\
+               fileList[2] : 'Slowing Cell',\
+               }
 
-    legends = {fileList[0] : 'Straight Hole',\
-               fileList[1] : 'Beveled Aperture',\
-               fileList[2] : 'de Laval I (H)',\
-               fileList[3] : 'de Laval II (J)'}
-
-    formats = {fileList[0] : 'go',\
-               fileList[1] : 'ro',\
-               fileList[2] : 'co',\
-               fileList[3] : 'yo'}
+    formats = {fileList[0] : 'o',\
+               fileList[1] : 'o',\
+               fileList[2] : 'o',\
+               }
 
     linestyles = {fileList[0] : '--',\
                   fileList[1] : '--',\
                   fileList[2] : ':',\
-                  fileList[3] : ':'}
+                  }
 
 
     fr_dic, ext_dic, sigE_dic, vr_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic,rhalf_dic = {},{},{},{},{},{},{},{},{}
@@ -441,7 +444,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.clf()
 
         plt.title("Forward Velocity vs Flow")
-        plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='ro')
+        plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='o')
         plt.xlabel("Flow [SCCM]")
         plt.ylabel("Forward Velocity [m/s]")
         plt.show()
@@ -455,7 +458,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         plt.clf()
         
         plt.title("Gas FWHM vs Flow\n(Plane 3cm past aperture)")
-        plt.errorbar(x=frs, y=rHalf, fmt='ro')
+        plt.errorbar(x=frs, y=rHalf, fmt='o')
         plt.xlabel("Flow [SCCM]")
         plt.ylabel("Half Radius [mm]")
         plt.show()
@@ -594,7 +597,7 @@ def get_window_stats(file = 'Hcell.dat', z=0.094, which_flow='f005', write=0, pl
         
 
         if write == 1:
-            with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/{}'.format(file), 'a') as tc:
+            with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/BGWindow/{}'.format(file), 'a+') as tc:
                 tc.write('  '.join(map(str, [z, flowrate, round(np.mean(vzs),3), round(np.std(vzs),3), round(np.mean(vrs),3),\
                          round(np.std(vrs),3), round(spreadB,3), round(1000*rHalf, 3), WINDOW_RAD] ))+'\n')
 

@@ -794,12 +794,14 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #This should be 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = {'f':120, 'g':120,\
-                      'h':240, 'j':240, 'k':240, 'm':240}[file_ext[0]]
+                      'h':240, 'j':240, 'k':240, 'm':240,\
+                      'p':200}[file_ext[0]]
 
     #0.064 for f and g cell geometries, 0.06785 for h, j, k cells. Only matters for print
     #output, not for data analysis
     DEFAULT_APERTURE = {'f':0.064, 'g':0.064,\
-                        'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785}[file_ext[0]]
+                        'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785,\
+                        'p':0.0726}[file_ext[0]]
 
     #64 mm for f/g, 67.85mm for h
     z_center=1000*DEFAULT_APERTURE
@@ -838,7 +840,9 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                'ClusterKCell':'ClusterKCell/{}.dat',\
              'InitLargeKCell':'InitLargeKCell/{}_init1.dat',\
                'ClusterMCell':'ClusterMCell/{}.dat',\
-             'InitAblatFCell':'InitAblatFCell/{}.dat'
+             'InitAblatFCell':'InitAblatFCell/{}.dat',\
+               'ClusterPCell':'ClusterPCell/{}.dat',\
+                  'TStep100' :'TStep100/{}_01.dat',\
                 }
 
 #    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
@@ -862,7 +866,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'f002':2, 'f005':5, 'f010':10, 'f020':20, 'f050':50, 'f100':100, 'f200':200,\
                 'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200,\
                 'k002':2, 'k005':5, 'k010':10, 'k020':20, 'k050':50, 'k100':100, 'k200':200,\
-                'm002':2, 'm005':5, 'm010':10, 'm020':20, 'm050':50, 'm100':100, 'm200':200}[file_ext]
+                'm002':2, 'm005':5, 'm010':10, 'm020':20, 'm050':50, 'm100':100, 'm200':200,\
+                'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1208,7 +1213,7 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
-    geom='f'
+    geom='p'
     fileList = ['002', '005', '010', '020', '050']
 
 #    folder = 'InitLarge'
@@ -1226,8 +1231,8 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
 
     if plot == True:
 
-        folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
-        f = np.loadtxt(folder+file, skiprows=1)
+        directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+        f = np.loadtxt(directory+folder+'/'+file, skiprows=1)
 
         zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
         thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
@@ -1362,11 +1367,11 @@ def series_multirate_plots(plane=0.064):
 
 #############################################################
 
-    dataSets = {'TimeColumn/plane94_mr.dat' : (1, 'Straight Hole', 'o', '--') ,\
+    dataSets = {'TimeColumn/plane94_mr.dat' : (0, 'Straight Hole', 'o', '--') ,\
                      'GCell/plane94_mr.dat' : (0, 'Beveled Aperture', 'o', '--') ,\
               'ClusterHCell/plane94_mr.dat' : (0, 'Hourglass', 'o', ':') ,\
-                 'ClusterJCell/plane94.dat' : (0, 'de Laval', 'o', ':') ,\
-                 'ClusterKCell/plane94.dat' : (0, 'de Laval III (K)', 'o', ':'),\
+                 'ClusterJCell/plane94.dat' : (0, 'de Laval-J', 'o', ':') ,\
+                 'ClusterKCell/plane94.dat' : (0, 'de Laval-K', 'o', ':'),\
 
 
                'TimeColumn/window94_mr.dat' : (0, 'Straight Hole', 'o', '--'),\
@@ -1375,10 +1380,10 @@ def series_multirate_plots(plane=0.064):
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
                 
-                'InitLarge/window94_mr.dat' : (0, 'Straight (i-1)', 'o', '--'),\
+                'InitLarge/window94_mr.dat' : (1, 'Straight (i-1)', 'o', '--'),\
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
               
-                 'InitLarge/plane94_mr.dat' : (1, 'Straight 94 (i-1)', 'o', '--'),\
+                 'InitLarge/plane94_mr.dat' : (0, 'Straight 94 (i-1)', 'o', '--'),\
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
                
                    'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
@@ -1386,14 +1391,17 @@ def series_multirate_plots(plane=0.064):
                 'ClusterMCell/plane111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
             
                   'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
-             'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
+             'InitLargeKCell/window111.dat' : (1, 'de Laval K (I1)', 'o', '--'),\
                'ClusterMCell/window111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
                
               'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
                'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
                 'InitLarge/aperture_mr.dat' : (0, 'Normal', 'o', '--'),
               'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
-               'InitAblatFCell/plane94.dat' : (1, 'Ablation', 'o', '--'),\
+               'InitAblatFCell/plane94.dat' : (0, 'Ablation', 'o', '--'),\
+               
+               'ClusterPCell/plane1026.dat' : (0, 'P cell', 'o', '--'),\
+              'ClusterPCell/window1026.dat' : (1, 'P cell', 'o', '--'),\
                 
                 
                 
@@ -1463,7 +1471,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    howMany = 5
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
@@ -1529,17 +1537,19 @@ def series_vz_plots():
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
 
-    seriesList = ['TimeColumn/plane94_window.dat',\
-                'BevelGeometry/plane94_window.dat',\
-                'ClusterLaval/plane3cm_window.dat',\
-                'fBG', 'gBG', 'hBG']
+    seriesList = ['TimeColumn/window94_mr.dat',\
+#                'BevelGeometry/plane94_window.dat',\
+                'ClusterHCell/window94_mr.dat',\
+                'fBG',\
+#                'gBG',\
+                 'hBG']
 
     legends = {seriesList[0] : 'Straight Hole',\
-               seriesList[1] : 'Beveled Aperture',\
-               seriesList[2] : 'de Laval',\
-               seriesList[3] : 'Straight Hole BG',\
-               seriesList[4] : 'Beveled Aperture BG',\
-               seriesList[5] : 'de Laval BG'}
+#               seriesList[1] : 'Beveled Aperture',\
+               seriesList[1] : 'Hourglass',\
+               seriesList[2] : 'Straight Hole BG',\
+#               seriesList[4] : 'Beveled Aperture BG',\
+               seriesList[3] : 'Hourglass BG'}
 
     # formats = {seriesList[0] : 'go',\
     #            seriesList[1] : 'ro',\
@@ -1547,10 +1557,10 @@ def series_vz_plots():
     #
     linestyles = { seriesList[0] : '--',\
                    seriesList[1] : '--',\
-                   seriesList[2] : '--',\
-                   seriesList[3] : '-',\
-                   seriesList[4] : '-',\
-                   seriesList[5] : '-'}
+                   seriesList[2] : '-',\
+                   seriesList[3] : '-'}
+#                   seriesList[4] : '-',\
+#                   seriesList[5] : '-'}
 
     for file in seriesList:
         if file in ['fBG', 'gBG', 'hBG']:
@@ -1579,8 +1589,8 @@ def series_vz_plots():
 
     plt.title("Forward Velocity vs Flow\nDashed = molecules, solid = buffer gas")
     plt.xlabel("Flow [SCCM]")
-    plt.ylabel("Velocity FWHM [m/s]")
-    plt.annotate('BG velocity measured 3cm past nozzle (post-expansion)',(0,235))
+    plt.ylabel("Forward Velocity [m/s]")
+#    plt.annotate('BG velocity measured 3cm past nozzle (post-expansion)',(0,235))
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
     for file in seriesList:
         plt.errorbar(x=fr_dic[file], y=(vz_dic[file]), yerr=(vzSig_dic[file]), label=legends[file], ls=linestyles[file])

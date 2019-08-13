@@ -355,6 +355,7 @@ def initial_species_velocity(mode=1):
         Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
                            *np.sin(phi), v0*np.cos(theta))
     elif mode in [2]:
+        
         Vx, Vy, Vz = v0, 0, 0
 
     return Vx, Vy, Vz
