@@ -21,7 +21,7 @@ fileList = ['h5/Set1/probeResults.dat',\
 
 
 def showDensityPlot(cellNum):
-    lineWidth = 2.
+    lineWidth = 3.
     pos0 = 0.064
     folder = "C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/Probe/"
 
@@ -91,7 +91,7 @@ def showDensityPlot(cellNum):
         ax3.hlines(9, 0, 67.85, colors='gray', linewidths=lineWidth)
 
 
-    ax3.set_xlim(0, 67)
+    ax3.set_xlim(0, 72)
     ax3.set_ylim(0, 10)
     plt.show()
 
