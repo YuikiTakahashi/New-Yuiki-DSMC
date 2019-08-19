@@ -35,7 +35,8 @@ knownGeometries = {\
                    'kCell' : (0.064, 0.24),\
                    'mCell' : (0.081, 0.24),\
                    'nCell' : (0.073, 0.14),\
-                   'pCell' : (0.0726, 0.2)\
+                   'pCell' : (0.0726, 0.2),\
+                   'qCell' : (0.064, 0.12)\
                    }
 
 collProb = 0.1 #Probability of collision, set at 1/10
@@ -80,7 +81,9 @@ def get_flow_chars(filename):
 
     #e.g. filename = flows/G_Cell/DS2g020
     if filename[13:16] == "DS2":
-        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell", 'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell"}[filename[16]]
+        geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell",\
+                    'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell",\
+                    'q':"qCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
 
@@ -234,6 +237,15 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in6 = r < 0.030 and z >= 0.0726 and z < endPos
         inside = in1 + in2 + in3 + in4 + in5 + in6
         return inside
+
+    elif form == 'qCell':
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2a = r < 0.0025 and z > 0.0635 and z < 0.064
+        in2b = r < 0.00635 and r > 0.00585 and z > 0.0635 and z < 0.064
+        in3 = r < 0.030 and z >= 0.064 and z < endPos
+        inside = in1 + in2a + in2b + in3
+        return inside
+
     else:
         raise ValueError('Could not find bounds for geometry {}'.format(form))
 
@@ -643,7 +655,7 @@ if __name__ == '__main__':
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
         #print("2")
 
-        if geometry in ['fCell', 'gCell', 'nCell']:
+        if geometry in ['fCell', 'gCell', 'nCell', 'qCell']:
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
