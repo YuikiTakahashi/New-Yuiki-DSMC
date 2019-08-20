@@ -20,13 +20,18 @@ import sys
 # import matplotlib.pyplot as plt
 from collections import defaultdict
 
+#Set as 1 for basic vel_pdf
+#Set as 2 for vel_corrected_pdf
+SIMPLE_FLAG = 1 #DEFAULT is 1 i.e. simplest approximation
+
+
+
 #Label all known geometries and map to a tuple (default_aperture, default_endPos)
 #  1. default_aperture: gives the z position (mm) of what we take to be the aperture \
 #                       in this geometry, used to tell when to start recording the
 #                       particle location when LITE_MODE is true
 #  2. default_endPos: gives the z position (mm) of the "end" point of the simulation
 #                       site, i.e. where to stop the computation if the molecule gets there.
-
 knownGeometries = {\
                    'fCell' : (0.064, 0.12),\
                    'gCell' : (0.064, 0.12),\
@@ -102,7 +107,9 @@ class vel_pdf(st.rv_continuous):
     def _pdf(self,x):
         return (m/(2*np.pi*kb*T))**1.5 * 4*np.pi * x**2 * np.exp(-m*x**2/(2*kb*T))
 
-
+class vel_corrected_pdf(st.rv_continuous):
+    def _pdf(self,x):
+        return (m**2)/(2 * kb**2 * T**2) * x**3 * np.exp(-m*x**2/(2*kb*T)) #extra factor of v
 # Maxwell-Boltzmann Velocity Distribution for species molecules
 # Used exclusively for setting initial velocities at a specified T_s
 class species_vel_pdf(st.rv_continuous):
@@ -113,7 +120,7 @@ class species_vel_pdf(st.rv_continuous):
 def coll_vel_pdf(x, y, z):
     '''
     For a given vector of *velocity* <x, y, z>, return the probability density of
-    an ambient molecule having that velocity given it was involved in a collision.
+    an ambient atom having that velocity given it was involved in a collision.
     '''
     sqspeed = x**2 + y**2 + z**2
     rel = ((x-(vx-xFlow))**2 + (y-(vy-yFlow))**2 + (z-(vz-zFlow))**2)**0.5
@@ -319,20 +326,36 @@ def coll_vel_index_pdf(x, y, z, p, w):
     '''
     return coll_vel_pdf(p*(x-w/2), p*(y-w/2), p*(z-w/2))
 
-def getAmbientVelocity(precision=4, width=700, simple=True):
+def getAmbientVelocity(precision=4, width=700, simple=1):
     '''
     Returns the total ambient particle velocity from species rest frame.
     Each thermal velocity component can range from -width/2 to width/2 (m/s).
     Allowed thermal velocity components are spaced by "precision" (m/s).
-    SIMPLE case: for testing, uses vel_pdf instead of coll_vel_pdf.
+
+    SIMPLE 1: for testing, uses vel_pdf instead of coll_vel_pdf.
+
+    SIMPLE 2: uses vel_corrected_pdf, which has an extra factor of v
     '''
-    if simple == True:
+    if simple == 1:
         v0 = vel_cv.rvs()
         theta = theta_cv.rvs()
         phi = np.random.uniform(0, 2*np.pi)
         Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
                            *np.sin(phi), v0*np.cos(theta))
         return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+
+    #Slightly more refined case. Rather than sample from a regular Maxwell-Boltzmann,
+    #we attach an extra factor of v to the PDF, to account for collision frequency depending
+    #on relative velocity, but approximate the molecule speed as negligible.
+    elif simple == 2:
+        v0 = vel_corrected_cv.rvs()
+        theta = theta_cv.rvs()
+        phi = np.random.uniform(0, 2*np.pi)
+        Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                           *np.sin(phi), v0*np.cos(theta))
+        return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+
+
 
     width = int(width/precision) # scale for mesh
     probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
@@ -440,7 +463,7 @@ def collide():
     global vx, vy, vz
     Theta = Theta_cv.rvs()
     Phi = np.random.uniform(0, 2*np.pi)
-    vx_amb, vy_amb, vz_amb = getAmbientVelocity(precision=3, simple=True)
+    vx_amb, vy_amb, vz_amb = getAmbientVelocity(precision=3, simple=SIMPLE_FLAG)
     v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
     B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
 
@@ -611,8 +634,9 @@ if __name__ == '__main__':
     INIT_MODE = args.init_mode
     PROBE_MODE = args.probe_mode
 
-    print("Particle number {0}, crossmult {1}, LITE_MODE is {2}, INIT_MODE {3}".format(PARTICLE_NUMBER,crossMult,LITE_MODE, INIT_MODE))
-    print("PROBE_MODE is {}".format(PROBE_MODE))
+    print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_MODE {3}".format(PARTICLE_NUMBER,crossMult,LITE_MODE, INIT_MODE))
+    print("PROBE_MODE {}".format(PROBE_MODE))
+    print("SIMPLE_FLAG = {}".format(SIMPLE_FLAG))
     # =============================================================================
     # Constant Initialization
     # =============================================================================
@@ -635,6 +659,8 @@ if __name__ == '__main__':
     set_derived_quants()
 
     vel_cv = vel_pdf(a=0, b=4*vMean, name='vel_pdf') # vel_cv.rvs()
+    vel_corrected_cv = vel_corrected_pdf(a=0,b=4*vMean, name='vel_corrected_pdf') #Implementing approximate Bayesian approach i.e. extra factor of v
+
     species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
     theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
     Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
