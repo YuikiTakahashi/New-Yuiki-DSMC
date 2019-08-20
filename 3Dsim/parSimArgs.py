@@ -36,7 +36,8 @@ knownGeometries = {\
                    'mCell' : (0.081, 0.24),\
                    'nCell' : (0.073, 0.14),\
                    'pCell' : (0.0726, 0.2),\
-                   'qCell' : (0.064, 0.12)\
+                   'qCell' : (0.064, 0.12),\
+                   'rCell' : (0.064, 0.12)\
                    }
 
 collProb = 0.1 #Probability of collision, set at 1/10
@@ -83,9 +84,8 @@ def get_flow_chars(filename):
     if filename[13:16] == "DS2":
         geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell",\
                     'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell",\
-                    'q':"qCell"}[filename[16]]
+                    'q':"qCell", 'r':"rCell"}[filename[16]]
         flowrate = int(filename[17:20])
-
 
     else:
         raise ValueError('Could not recognize the DS2 flow file')
@@ -244,6 +244,13 @@ def inBounds(x, y, z, form='box', endPos=0.12):
         in2b = r < 0.00635 and r > 0.00585 and z > 0.0635 and z < 0.064
         in3 = r < 0.030 and z >= 0.064 and z < endPos
         inside = in1 + in2a + in2b + in3
+        return inside
+
+    elif form == 'rCell':
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+        in3 = r < 0.030 and z >= 0.0640 and z < endPos
+        inside = in1 + in2 + in3
         return inside
 
     else:
@@ -655,7 +662,7 @@ if __name__ == '__main__':
         quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
         #print("2")
 
-        if geometry in ['fCell', 'gCell', 'nCell', 'qCell']:
+        if geometry in ['fCell', 'gCell', 'nCell', 'qCell', 'rCell']:
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
         elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
             grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
