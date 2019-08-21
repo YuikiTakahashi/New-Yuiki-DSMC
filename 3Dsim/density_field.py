@@ -17,7 +17,7 @@ def main():
 
     parser = argparse.ArgumentParser('Simulation Specs')
     parser.add_argument('-ff', dest='ff', action='store') # Specify flowfield
-    parser.set_defaults(ff='K_Cell/DS2k005.DAT')
+    parser.set_defaults(ff='F_Cell/DS2f005.DAT')
     args = parser.parse_args()
     FF = args.ff
 
@@ -35,11 +35,12 @@ def main():
     plot_dens()
 
 def set_many():
-    flist = ['002','005','010','020','050','100','200']
+    flist = ['002','100']
     for f in flist:
-        set_params(FF='K_Cell/DS2k{}.DAT'.format(f))
-#        set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
-#        set_params(FF='K_Cell/DS2k{}.DAT'.format(f))
+        set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
+        set_params(FF='M_Cell/DS2m{}.DAT'.format(f))
+        set_params(FF='N_Cell/DS2n{}.DAT'.format(f))
+        set_params(FF='P_Cell/DS2p{}.DAT'.format(f))
 
 def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
@@ -344,7 +345,7 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     title = {'mfp':'Mean Free Path', 'vz':'Forward Velocity', 'temp':'Temperature','dens':'Density'}[quantity]
 
     fig, ax = plt.subplots()
-    plt.title('Buffer Gas '+title+'\nde Laval aperture')
+    plt.title('Buffer Gas '+title+'\n(Centerline)')
 
     z_array = np.linspace(z0,zf,num=array_size)
     #plt.title("Mean Free Path in Buffer Gas \n Flowrate = {} SCCM".format(which_flow))
@@ -357,12 +358,15 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     legends={}
     for flow in flowList:
         if flow not in legends:
-            flowtype = {'f': 'Straight ',\
-                        'g': 'Bevel hole, ',\
-                        'h': 'de Laval, ',\
-                        'p': 'Slowing Cell '}[flow[0]]
+            flowtype = {'f' : 'Standard ',\
+                        'g' : 'Bevel G ',\
+                        'h' : 'Hourglass ',\
+                        'k' : 'Laval K',\
+                        'p' : 'Slowing P ',\
+                        'm' : 'Slowing M ',\
+                        'n' : 'Slowing N '}[flow[0]]
 #            flowtype=''
-            flowrate = str(int(flow[1:4]))+' SCCM'
+            flowrate = '('+str(int(flow[1:4]))+' SCCM)'
             legends.update( {flow : flowtype+flowrate})
 
     for f in flowList:
@@ -371,18 +375,18 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
         for i in range(array_size):
             quant_array[i] = getter(x=0,y=0,z=z_array[i], which_flow=f)
 
-        ax.plot(z_array, quant_array, label=legends[f])
+        ax.plot(1000*(z_array-0.064), quant_array, label=legends[f])
 
 
     if logscale:
         plt.yscale('Log')
         plt.ylabel('Log '+title)
     else:
-        plt.ylabel(title)
+        plt.ylabel(title+' [$m^{-3}$]')
 
-    plt.xlabel('Z distance (m)')
-    plt.axvline(x=0.064)
-    plt.axvline(x=0.081)
+    plt.xlabel('Z distance from aperture [mm]')
+    plt.axvline(x=64-64)
+    plt.axvline(x=73-64)
     plt.legend()
     plt.show()
 

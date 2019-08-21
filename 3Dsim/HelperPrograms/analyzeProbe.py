@@ -1,3 +1,11 @@
+'''
+Created summer 2019.
+
+Code for compiling and plotting "probe" style: i.e. showing probability of
+successful molecule extraction as a function of initial location in the cell.
+'''
+
+
 from argparse import ArgumentParser
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,6 +13,7 @@ from matplotlib.lines import Line2D
 
 APERTURE_POS = 64.0 #z axis location of aperture in mm
 cellGeometry = 'h'
+
 fileList = ['h5/Set1/probeResults.dat',\
             'h5/Set2/probeResults.dat',\
             'h5/Set3/probeResults.dat',\
@@ -21,6 +30,10 @@ fileList = ['h5/Set1/probeResults.dat',\
 
 
 def showDensityPlot(cellNum):
+    '''
+    Reads data from every file in fileList and plots it density style, i.e. averaging
+    success rate over bins (number of bins determined by cellNum).
+    '''
     lineWidth = 3.
     pos0 = 0.064
     folder = "C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/Probe/"
@@ -95,7 +108,17 @@ def showDensityPlot(cellNum):
     ax3.set_ylim(0, 10)
     plt.show()
 
+def showWallPlot():
+    lineWidth = 3.
+
+
+
+
 def showPointPlot(dotSize):
+    '''
+    Reads data from every file in fileList and plots invidividual points, i.e.
+    a green dot for a successful extraction, red for failed.
+    '''
 
     lineWidth = 2.
     pos0 = 0.064
@@ -158,14 +181,10 @@ def showPointPlot(dotSize):
 
     return
 
-#*********************************************************************#
-#Read file output by parSimArgs (run on PROBE_MODE and init_mode>=9 )
-#and write to a probeResults type file, with rows as [X Y Z M]
-#(M = 0 or 1, indicating success or failure in extraction)
-#*********************************************************************#
+
 def analyzeFiles(directory, OUTFILE, READFILE, write):
     '''
-    Read file output by parSimArgs (run on PROBE_MODE and init_mode>=9) and write
+    Read file output of parSimArgs (run on PROBE_MODE and init_mode>=9) and write
     to a probeResults type file, with rows as [X Y Z M] (M = 0 or 1, indicating
     success or failure in extraction)
     '''
@@ -247,9 +266,8 @@ if __name__ == '__main__':
     parser.add_argument('-fout', '--outfile')
     parser.add_argument('-fin', '--readfile')
     parser.add_argument('--write', dest='write', action='store_true', default=False)
-    parser.add_argument('--plot', dest='plot', action='store_true', default=False)
+    parser.add_argument('--plot', dest='plotType', action='store', default=None)
     parser.add_argument('--dotsize', dest='dotsize', type=int, default=1)
-    parser.add_argument('--dens', dest='dens', action='store_true', default=False)
     parser.add_argument('--cellnum', dest='cellNum', type=int, default=100)
     args=parser.parse_args()
 
@@ -257,15 +275,17 @@ if __name__ == '__main__':
     OUTFILE = args.outfile
     READFILE = args.readfile
     write = args.write
-    plot = args.plot
+
+    plot = args.plotType
+
     dotSize = args.dotsize
-    densityPlot = args.dens
     cellNum = args.cellNum
 
-    if plot:
-        if densityPlot:
-            showDensityPlot(cellNum)
-        else:
-            showPointPlot(dotSize)
-    else:
+    if plot == 'density':
+        showDensityPlot(cellNum)
+    elif plot == 'points':
+        showPointPlot(dotSize)
+    elif plot == 'wall':
+        showWallPlot()
+    elif plot == None:
         analyzeFiles(directory, OUTFILE, READFILE, write)

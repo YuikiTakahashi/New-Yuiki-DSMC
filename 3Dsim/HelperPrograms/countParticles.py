@@ -1,6 +1,12 @@
 import numpy as np
 import argparse
 
+'''
+Takes a particle trajectory data file (i.e. output from parSimArgs) and reports
+number of simulated particles by counting the number of [0,0,0,0,0,0] rows.
+'''
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Simulation Specs')
