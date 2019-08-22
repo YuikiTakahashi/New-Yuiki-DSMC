@@ -795,13 +795,13 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #This should be 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = {'f':120, 'g':120,\
                       'h':240, 'j':240, 'k':240, 'm':240,\
-                      'p':200}[file_ext[0]]
+                      'p':200, 'n':140, 'q':120}[file_ext[0]]
 
     #0.064 for f and g cell geometries, 0.06785 for h, j, k cells. Only matters for print
     #output, not for data analysis
     DEFAULT_APERTURE = {'f':0.064, 'g':0.064,\
                         'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785,\
-                        'p':0.0726}[file_ext[0]]
+                        'p':0.0726,'n':0.073,'q':0.064}[file_ext[0]]
 
     #64 mm for f/g, 67.85mm for h
     z_center=1000*DEFAULT_APERTURE
@@ -815,6 +815,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #Radius (mm) of the window for particle measurements. Only used if window=True
     window_radius = 2.0
+    usefulCutoff = 50.0 #m/s upper bound on speed for "useful" molecules
 
     if rad_mode == False:
         print('Analysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-DEFAULT_APERTURE))
@@ -828,7 +829,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
 
 
-    #Nx6 array. Organized by x,y,z,vx,vy,vz
+    
 
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
@@ -842,17 +843,12 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                'ClusterMCell':'ClusterMCell/{}.dat',\
              'InitAblatFCell':'InitAblatFCell/{}.dat',\
                'ClusterPCell':'ClusterPCell/{}.dat',\
-                  'TStep100' :'TStep100/{}_01.dat',\
+               'ClusterNCell':'ClusterNCell/{}.dat',\
+                  'TStep100' :'TStep100/{}.dat',\
+               'ClusterQCell':'ClusterQCell/{}.dat'\
                 }
 
-#    f = np.loadtxt('/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/%s.dat'%file_ext, skiprows=1)
-#    f = np.loadtxt(directory + 'TimeColumn/{}_lite.dat'.format(file_ext), skiprows=1)
-#    f = np.loadtxt(directory + 'HalfCross/{}_half.dat'.format(file_ext), skiprows=1)
-#    f = np.loadtxt(directory + 'DoubleCross/{}_double.dat'.format(file_ext), skiprows=1)
-#    f = np.loadtxt(directory + 'BevelGeometry/{}.dat'.format(file_ext), skiprows=1)
-#    f = np.loadtxt(directory + 'ClusterLaval/{}.dat'.format(file_ext), skiprows=1)
-#    f = np.loadtxt(directory + 'InitLarge/{}_init1.dat'.format(file_ext), skiprows=1)
-
+    #Nx6 array. Organized by x,y,z,vx,vy,vz
     f = np.loadtxt(directory+ (folder_sw[folder]).format(file_ext), skiprows=1)
 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
@@ -867,7 +863,9 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'j002':2, 'j005':5, 'j010':10, 'j020':20, 'j050':50, 'j100':100, 'j200':200,\
                 'k002':2, 'k005':5, 'k010':10, 'k020':20, 'k050':50, 'k100':100, 'k200':200,\
                 'm002':2, 'm005':5, 'm010':10, 'm020':20, 'm050':50, 'm100':100, 'm200':200,\
-                'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200}[file_ext]
+                'n002':2, 'n005':5, 'n010':10, 'n020':20, 'n050':50, 'n100':100, 'n200':200,\
+                'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200,\
+                'q002':2, 'q005':5, 'q010':10, 'q020':20, 'q050':50, 'q100':100, 'q200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1025,10 +1023,14 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #Divide by a 1000 to convert
     xs, ys, zs, vxs, vys, vzs, times, thetas = pdata[:,0]/1000., pdata[:,1]/1000., pdata[:,2]/1000., \
                                 pdata[:,3], pdata[:,4], pdata[:,5], pdata[:,6], pdata[:,8]
-#    rs = np.sqrt(xs**2 + ys**2)
 
+
+    #Count number of particles slow enough to be "useful"
+    numUseful = np.size(vzs[vzs <= usefulCutoff])
+    
+    
     print("Number arrived = {0}, size of xs = {1}".format(numArrived, xs.shape))
-
+    
     vrs = np.sqrt(vxs**2 + vys**2)
     rs = np.sqrt(xs**2+ys**2) #these radii are calculated from the z-axis, not from the pos origin
 
@@ -1039,7 +1041,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     median_radius = np.median(rs) #radius of cylinder containing 50% of the particles
     median_theta = np.median(thetas)
     print('Median radius {0} mm, median theta {1} deg'.format(round(1000*median_radius,3), round(median_theta,3)) )
-
+    print('{} were useful ({}%)'.format(numUseful,round(100*numUseful/num,3)))
     fit_velocity_dist(vzs, vrs)
 
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
@@ -1156,7 +1158,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     print('Standard deviation in extraction: %.1f%%.'%(100*stdArrived))
 
     if window:
-        print('Of these, {} fit in window of radius {} mm'.format(numAnalyzing,window_radius))
+        print('Of these, {} fit in window of radius {} mm, {} of which were useful'.format(numAnalyzing,window_radius,numUseful))
 
     print('Radial velocity' + dep_title+ ': %.1f +- %.1f m/s'\
           %(np.mean(vrs), np.std(vrs)))
@@ -1195,7 +1197,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
             tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
-                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3), round(1000*median_radius,3)] ))+'\n')
+                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3), round(1000*median_radius,3),\
+                     round(100*numUseful/num,3), usefulCutoff] ))+'\n')
 
         tc.close()
 
@@ -1213,7 +1216,7 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
-    geom='p'
+    geom='n'
     fileList = ['002', '005', '010', '020', '050']
 
 #    folder = 'InitLarge'
@@ -1321,7 +1324,7 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
 # =============================================================================
 def series_multirate_plots(plane=0.064):
 
-    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic, medRad_dic = {},{},{},{},{},{},{},{},{}
+    fr_dic, ext_dic, sigE_dic, reyn_dic, vz_dic, vzSig_dic, spreadB_dic, vrSig_dic, medRad_dic, usf_dic = {},{},{},{},{},{},{},{},{},{}
 
     folder = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
@@ -1380,19 +1383,19 @@ def series_multirate_plots(plane=0.064):
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
                 
-                'InitLarge/window94_mr.dat' : (1, 'Straight (i-1)', 'o', '--'),\
+                   'InitLarge/window94.dat' : (1, 'Standard', 'o', '--'),\
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
               
-                 'InitLarge/plane94_mr.dat' : (0, 'Straight 94 (i-1)', 'o', '--'),\
+                    'InitLarge/plane94.dat' : (0, 'Standard', 'o', '--'),\
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
                
                    'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
               'InitLargeKCell/plane111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
-                'ClusterMCell/plane111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
+                'ClusterMCell/plane111.dat' : (0, 'Open Vent (too long)','o', '--'),\
             
                   'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
-             'InitLargeKCell/window111.dat' : (1, 'de Laval K (I1)', 'o', '--'),\
-               'ClusterMCell/window111.dat' : (0, 'Slowing Cell (I1)','o', '--'),\
+             'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
+               'ClusterMCell/window111.dat' : (1, 'Open Vent (too long)','o', '--'),\
                
               'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
                'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
@@ -1400,11 +1403,23 @@ def series_multirate_plots(plane=0.064):
               'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
                'InitAblatFCell/plane94.dat' : (0, 'Ablation', 'o', '--'),\
                
-               'ClusterPCell/plane1026.dat' : (0, 'P cell', 'o', '--'),\
-              'ClusterPCell/window1026.dat' : (1, 'P cell', 'o', '--'),\
+               'ClusterPCell/plane1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
+              'ClusterPCell/window1026.dat' : (1, 'Partial Adsorber', 'o', '--'),\
+              
+                    'TStep100/aperture.dat' : (0, '100step', 'o', '--'),\
+                     'TStep100/plane94.dat' : (0, '100step', 'o', '--'),\
+                    'TStep100/window94.dat' : (0, '100step', 'o', '--'),\
+                    
+                'ClusterNCell/plane103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
+               'ClusterNCell/window103.dat' : (1, 'Open Vent (fixed)', 'o', '--'),\
+               
+                'ClusterQCell/window94.dat' : (1, 'ExpQ', 'o', '--'),\
+                 'ClusterQCell/plane94.dat' : (0, 'ExpQ', 'o', '--'),\
+                'ClusterQCell/aperture.dat' : (0, 'ExpQ', 'o', '--'),\
                 
-                
-                
+                'ClusterRCell/window94.dat' : (0, 'ExpR', 'o', '--'),\
+                 'ClusterRCell/plane94.dat' : (0, 'ExpR', 'o', '--'),\
+                'ClusterRCell/aperture.dat' : (0, 'ExpR', 'o', '--'),\
              }
 
     seriesList, legends, formats, linestyles = [], {}, {}, {}
@@ -1417,18 +1432,6 @@ def series_multirate_plots(plane=0.064):
             formats.update( {x : dataSets[x][2]} )
             linestyles.update( {x : dataSets[x][3]} )
 
-
-#    seriesList = ['TimeColumn/far_plane.dat',\
-#                  'InitLarge/plane94.dat']
-#
-#    legends = {seriesList[0] : 'Standard',\
-#               seriesList[1] : 'Wide'}
-#
-#    formats = {seriesList[0] : 'ro',\
-#               seriesList[1] : 'co'}
-#
-#    linestyles = {seriesList[0] : '--',\
-#                  seriesList[1] : ':'}
 
 
     for file in seriesList:
@@ -1447,6 +1450,10 @@ def series_multirate_plots(plane=0.064):
         vrSig_dic.update( {file : vRSig})
         spreadB_dic.update( {file : spreadB} )
         medRad_dic.update( {file : mRad} )
+        
+        if f.shape[1] > 17:
+            usefulPercentage = f[:,17]
+            usf_dic.update( {file : usefulPercentage} )
 
 
 
@@ -1459,7 +1466,7 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-    howMany = 5
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(ext_dic[file])[0:howMany], yerr=(sigE_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()

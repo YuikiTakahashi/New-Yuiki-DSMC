@@ -3,14 +3,15 @@ import numpy as np
 # directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/WoollsData/'
 # infile = 'f100_c1.dat'
 # outfile = 'molTr_f100_150_75frames.dat'
-directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
+directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell_Ablat/"
 outdirectory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/Animation/"
-infile = 'f100_th.dat'
-outfile = 'mT_f100_75fr_th.dat'
+infile = 'f005.dat'
+outfile = 'mT_f005_75fr_th.dat'
 
 #This is for running on the cluster
 CLUSTER = 0
 VERBOSE = 0
+RUN_MAIN = 1
 
 NUM_FRAMES = 75
 
@@ -156,7 +157,7 @@ def get_data(filepath):
     so that the full trajectory is logged
     '''
     global f, numParticles, MAX_TIME
-
+    print("Loading...",end='')
     f = np.loadtxt(filepath, skiprows=1)
 
     numParticles = 0
@@ -190,10 +191,15 @@ def make_structures():
 # =============================================================================
 if __name__ == '__main__':
 
-    if CLUSTER==True:
+    if CLUSTER:
         directory=''
         outdirectory=''
+        initialize()
+        main()
+        writeData()
 
+    elif RUN_MAIN:
+        print("Running moleculeTracking")
         initialize()
         main()
         writeData()

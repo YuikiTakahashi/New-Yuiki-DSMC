@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 #directory = 'C:/Users/gabri/Desktop/HutzlerSims/Gas-Simulation/3Dsim/Data/'
 #file_ext = 'traj017d.dat'
 
-directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell/"
-file_ext = 'f100_th.dat'
+directory="C:/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/ThermalHeavy/F_Cell_Ablat/"
+file_ext = 'f005.dat'
 
 #Data for x, y, z comes in mm
 z0 = 0.015*1000
@@ -19,6 +19,7 @@ NR = 1000
 
 #This is for running on the cluster
 CLUSTER = False
+RUN_MAIN = 0
 WRITE_FILE = "THERMALDATA.dat"
 
 def main():
@@ -179,9 +180,18 @@ def plotFromFile(filename, quant):
     for i in range(len(f)):
         z, r = int(f[i,0]), int(f[i,1])
         arr[z][r] = f[i, whichCol]
-
-    plt.imshow(np.transpose(arr), origin='lower')
-#    plt.axis([15,120,0,30])
+    
+    lineWidth=2.
+    fig, ax = plt.subplots()
+    ax.imshow(np.transpose(arr), origin='lower', extent=[15,120,0,30],cmap='plasma',aspect='auto')
+#    ax.vlines(1, 0, 1.5875, colors='gray', linewidths=lineWidth)
+#    ax.hlines(1.5875, 1, 15, colors='gray', linewidths=lineWidth)
+    ax.vlines(15, 1.5875, 6.35, colors='gray', linewidths=lineWidth)
+    ax.hlines(6.35, 15, 63.5, colors='gray', linewidths=lineWidth)
+    ax.vlines(63.5, 6.35, 2.5, colors='gray', linewidths=lineWidth)
+    ax.hlines(2.5, 63.5, 64, colors='gray', linewidths=lineWidth)
+    ax.vlines(64, 2.5, 9, colors='gray', linewidths=lineWidth)
+    ax.hlines(9, 15, 64, colors='gray', linewidths=lineWidth)
     plt.show()
 # =============================================================================
 # Initializing data matrix, velocity maps and z/r axes
@@ -285,7 +295,11 @@ if __name__ == '__main__':
 
     if CLUSTER==True:
         directory=''
-
+        initialize()
+        main()
+        writeData(WRITE_FILE)
+    
+    elif RUN_MAIN:
         initialize()
         main()
         writeData(WRITE_FILE)
