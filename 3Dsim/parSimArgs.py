@@ -612,16 +612,16 @@ if __name__ == '__main__':
 
     print("Started main")
 
-    parser = argparse.ArgumentParser('Simulation Specs')
-    parser.add_argument('-ff', '--one') # Specify flowfield
-    parser.add_argument('-out', '--two') # Specify output filename
+    parser = argparse.ArgumentParser('Specify simulation params')
+    parser.add_argument('-ff', '--one', metavar='flows/X_Cell/DS2xyyy.DAT', help='File containing flowfield from DS2V output') # Specify flowfield
+    parser.add_argument('-out', '--two', metavar='xyyy.dat', help = 'Output file name, to store trajectory data') # Specify output filename
 
-    parser.add_argument('--mult', type=float, dest='mult', action='store') # Specify cross section multiplier (optional)
-    parser.add_argument('--npar', type=int, dest='npar', action='store') #Specify number of particles to simulate (optional, defaults to 1)
-    parser.add_argument('--lite', dest='lite', action='store_true')
+    parser.add_argument('--mult', type=float, dest='mult', action='store', help='Multiplier for the collision cross section') # Specify cross section multiplier (optional)
+    parser.add_argument('--npar', type=int, dest='npar', action='store', help='Number of particles to simulate') #Specify number of particles to simulate (optional, defaults to 1)
+    parser.add_argument('--lite', dest='lite', action='store_true', help = 'Set TRUE if recording trajectories inside the cell is not necessary')
 
-    parser.add_argument('--init_mode', type=int, dest='init_mode', action='store')
-    parser.add_argument('--probe_mode', dest='probe_mode', action='store_true')
+    parser.add_argument('--init_mode', type=int, dest='init_mode', action='store', help='Code number for initial particle distributions')
+    parser.add_argument('--probe_mode', dest='probe_mode', action='store_true', help='Set TRUE if only particles final locations are needed')
     parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
