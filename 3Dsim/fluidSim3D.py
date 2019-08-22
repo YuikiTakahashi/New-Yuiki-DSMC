@@ -829,7 +829,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         print('Analysis of data at dome r = %g m, centered at aperture:'%dome_rad0)
 
 
-    
+
 
     directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
 
@@ -1027,10 +1027,10 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #Count number of particles slow enough to be "useful"
     numUseful = np.size(vzs[vzs <= usefulCutoff])
-    
-    
+
+
     print("Number arrived = {0}, size of xs = {1}".format(numArrived, xs.shape))
-    
+
     vrs = np.sqrt(vxs**2 + vys**2)
     rs = np.sqrt(xs**2+ys**2) #these radii are calculated from the z-axis, not from the pos origin
 
@@ -1198,7 +1198,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
                      round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3), round(1000*median_radius,3),\
-                     round(100*numUseful/num,3), usefulCutoff] ))+'\n')
+                     ] ))+'\n')
 
         tc.close()
 
@@ -1222,12 +1222,12 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
 #    folder = 'InitLarge'
 
     if write==True:
-        
+
         if header:
             with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+file), 'a+') as tc:
                 tc.write("PlaneZ FR   Gamma  Ext    sigE   vR     sigvR vZ      sigvZ   Sprd    theta   sigTh time   sigT   Reyn  SprdB   MedRad(mm)\n")
             tc.close()
-        
+
         for f in fileList:
             analyzeTrajData(geom+f, folder, file, pos=plane, window=windowMode, write=True, rad_mode=False)
 
@@ -1382,41 +1382,41 @@ def series_multirate_plots(plane=0.064):
              'ClusterHCell/window94_mr.dat' : (0, 'Hourglass', 'o', '--'),\
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
-                
+
                    'InitLarge/window94.dat' : (1, 'Standard', 'o', '--'),\
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
-              
+
                     'InitLarge/plane94.dat' : (0, 'Standard', 'o', '--'),\
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
-               
+
                    'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
               'InitLargeKCell/plane111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
                 'ClusterMCell/plane111.dat' : (0, 'Open Vent (too long)','o', '--'),\
-            
+
                   'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
              'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
                'ClusterMCell/window111.dat' : (1, 'Open Vent (too long)','o', '--'),\
-               
+
               'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
                'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
                 'InitLarge/aperture_mr.dat' : (0, 'Normal', 'o', '--'),
               'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
                'InitAblatFCell/plane94.dat' : (0, 'Ablation', 'o', '--'),\
-               
+
                'ClusterPCell/plane1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
               'ClusterPCell/window1026.dat' : (1, 'Partial Adsorber', 'o', '--'),\
-              
+
                     'TStep100/aperture.dat' : (0, '100step', 'o', '--'),\
                      'TStep100/plane94.dat' : (0, '100step', 'o', '--'),\
                     'TStep100/window94.dat' : (0, '100step', 'o', '--'),\
-                    
+
                 'ClusterNCell/plane103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
                'ClusterNCell/window103.dat' : (1, 'Open Vent (fixed)', 'o', '--'),\
-               
+
                 'ClusterQCell/window94.dat' : (1, 'ExpQ', 'o', '--'),\
                  'ClusterQCell/plane94.dat' : (0, 'ExpQ', 'o', '--'),\
                 'ClusterQCell/aperture.dat' : (0, 'ExpQ', 'o', '--'),\
-                
+
                 'ClusterRCell/window94.dat' : (0, 'ExpR', 'o', '--'),\
                  'ClusterRCell/plane94.dat' : (0, 'ExpR', 'o', '--'),\
                 'ClusterRCell/aperture.dat' : (0, 'ExpR', 'o', '--'),\
@@ -1450,7 +1450,7 @@ def series_multirate_plots(plane=0.064):
         vrSig_dic.update( {file : vRSig})
         spreadB_dic.update( {file : spreadB} )
         medRad_dic.update( {file : mRad} )
-        
+
         if f.shape[1] > 17:
             usefulPercentage = f[:,17]
             usf_dic.update( {file : usefulPercentage} )
