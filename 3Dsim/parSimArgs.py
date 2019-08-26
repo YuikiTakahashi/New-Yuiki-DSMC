@@ -584,6 +584,7 @@ def showWalls():
     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
     f.close()
 
+
 def plot_boundaries(endPoint=0.12):
     global geometry
 

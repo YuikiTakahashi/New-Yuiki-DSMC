@@ -795,13 +795,13 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #This should be 120 for F and G geometries, 240 for H, J, K geometries
     DEFAULT_ENDPOS = {'f':120, 'g':120,\
                       'h':240, 'j':240, 'k':240, 'm':240,\
-                      'p':200, 'n':140, 'q':120}[file_ext[0]]
+                      'p':200, 'n':140, 'q':120, 'r':120}[file_ext[0]]
 
     #0.064 for f and g cell geometries, 0.06785 for h, j, k cells. Only matters for print
     #output, not for data analysis
     DEFAULT_APERTURE = {'f':0.064, 'g':0.064,\
                         'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785,\
-                        'p':0.0726,'n':0.073,'q':0.064}[file_ext[0]]
+                        'p':0.0726,'n':0.073,'q':0.064, 'r':0.064}[file_ext[0]]
 
     #64 mm for f/g, 67.85mm for h
     z_center=1000*DEFAULT_APERTURE
@@ -844,8 +844,10 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
              'InitAblatFCell':'InitAblatFCell/{}.dat',\
                'ClusterPCell':'ClusterPCell/{}.dat',\
                'ClusterNCell':'ClusterNCell/{}.dat',\
+               'ClusterRCell':'ClusterRCell/{}.dat',\
                   'TStep100' :'TStep100/{}.dat',\
-               'ClusterQCell':'ClusterQCell/{}.dat'\
+               'ClusterQCell':'ClusterQCell/{}.dat',\
+             'CorrectedDist' :'CorrectedDist/{}.dat'\
                 }
 
     #Nx6 array. Organized by x,y,z,vx,vy,vz
@@ -865,7 +867,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'm002':2, 'm005':5, 'm010':10, 'm020':20, 'm050':50, 'm100':100, 'm200':200,\
                 'n002':2, 'n005':5, 'n010':10, 'n020':20, 'n050':50, 'n100':100, 'n200':200,\
                 'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200,\
-                'q002':2, 'q005':5, 'q010':10, 'q020':20, 'q050':50, 'q100':100, 'q200':200}[file_ext]
+                'q002':2, 'q005':5, 'q010':10, 'q020':20, 'q050':50, 'q100':100, 'q200':200,\
+                'r002':2, 'r005':5, 'r010':10, 'r020':20, 'r050':50, 'r100':100, 'r200':200}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -1216,7 +1219,7 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
-    geom='n'
+    geom='r'
     fileList = ['002', '005', '010', '020', '050']
 
 #    folder = 'InitLarge'
@@ -1383,10 +1386,12 @@ def series_multirate_plots(plane=0.064):
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
 
-                   'InitLarge/window94.dat' : (1, 'Standard', 'o', '--'),\
+                   'InitLarge/window94.dat' : (0, 'Standard', 'o', '--'),\
+              
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
 
                     'InitLarge/plane94.dat' : (0, 'Standard', 'o', '--'),\
+                    
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
 
                    'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
@@ -1395,31 +1400,35 @@ def series_multirate_plots(plane=0.064):
 
                   'InitLarge/window111.dat' : (0, 'Straight (I1)', 'o', '--'),\
              'InitLargeKCell/window111.dat' : (0, 'de Laval K (I1)', 'o', '--'),\
-               'ClusterMCell/window111.dat' : (1, 'Open Vent (too long)','o', '--'),\
+               'ClusterMCell/window111.dat' : (0, 'Open Vent (too long)','o', '--'),\
 
               'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
                'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
-                'InitLarge/aperture_mr.dat' : (0, 'Normal', 'o', '--'),
+                'InitLarge/aperture_mr.dat' : (1, 'Normal', 'o', '--'),
               'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
                'InitAblatFCell/plane94.dat' : (0, 'Ablation', 'o', '--'),\
 
                'ClusterPCell/plane1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
-              'ClusterPCell/window1026.dat' : (1, 'Partial Adsorber', 'o', '--'),\
+              'ClusterPCell/window1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
 
                     'TStep100/aperture.dat' : (0, '100step', 'o', '--'),\
                      'TStep100/plane94.dat' : (0, '100step', 'o', '--'),\
                     'TStep100/window94.dat' : (0, '100step', 'o', '--'),\
 
                 'ClusterNCell/plane103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
-               'ClusterNCell/window103.dat' : (1, 'Open Vent (fixed)', 'o', '--'),\
+               'ClusterNCell/window103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
 
-                'ClusterQCell/window94.dat' : (1, 'ExpQ', 'o', '--'),\
+                'ClusterQCell/window94.dat' : (0, 'ExpQ', 'o', '--'),\
                  'ClusterQCell/plane94.dat' : (0, 'ExpQ', 'o', '--'),\
                 'ClusterQCell/aperture.dat' : (0, 'ExpQ', 'o', '--'),\
 
                 'ClusterRCell/window94.dat' : (0, 'ExpR', 'o', '--'),\
                  'ClusterRCell/plane94.dat' : (0, 'ExpR', 'o', '--'),\
-                'ClusterRCell/aperture.dat' : (0, 'ExpR', 'o', '--'),\
+                'ClusterRCell/aperture.dat' : (1, 'ExpR', 'o', '--'),\
+                
+               'CorrectedDist/aperture.dat' : (0, 'Corrected', 'o',':'),\
+               'CorrectedDist/window94.dat' : (0, 'Corrected', 'o',':'),\
+                'CorrectedDist/plane94.dat' : (0, 'Corrected', 'o',':')\
              }
 
     seriesList, legends, formats, linestyles = [], {}, {}, {}
@@ -1466,7 +1475,7 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-    howMany = 7
+    howMany = 5
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(ext_dic[file])[0:howMany], yerr=(sigE_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
@@ -1478,7 +1487,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    howMany = 7
+    howMany = 5
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
