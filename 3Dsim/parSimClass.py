@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jun 20 15:43:30 2018
-
-@author: Dave
-
-This is an auxiliary file containing only a specific set of parameters and
-functionalities desired for processing on the HPC cluster.
+Created August 2019
+@author: Gabriel
 """
 
 import numpy as np
@@ -34,6 +30,9 @@ MASS_PARAM = 2 * M_HE / (M_HE + M_S)
 # self._M = .190061 / NA # Species mass (kg)
 # self._massParam = 2 * m / (m + M)
 
+###############################################################################
+# SIMULATION CLASS
+###############################################################################
 class ParticleTracing(object):
     '''
     Main simulation class. Simulates path of a YbOH molecule through
@@ -95,8 +94,6 @@ class ParticleTracing(object):
         #"Corrected" uses approximate Bayesian approach i.e. extra factor of v
         self._vel_ambient_cv =  AmbientCorrected_pdf(a=0, b=4*vMean, name='vel_corrected_pdf')
 
-        # self._species_vel_cv = species_vel_pdf(a=0, b=5*vMeanM, name='species_vel_pdf') # species_vel_cv.rvs()
-
         self._theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
         self._Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
 
@@ -131,7 +128,7 @@ class ParticleTracing(object):
             else:
                 raise ValueError('Unknown geometry')
 
-            print("Loading grids ... ",end='')
+            print("Loading grids ... ")
             grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
             grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
             grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
@@ -151,10 +148,13 @@ class ParticleTracing(object):
             raise ValueError('Could not load flow field')
         #End of class constructor __init__()
 
+
+###############################################################################
+# MAIN PROGRAM METHODS
+###############################################################################
     def get_trajectory(self, boundary):
         '''
         To be run in parallel in the self.main class method.
-
         Computes one molecule trajectory, returns it as list.
         '''
         return self.track_molecules(endPos=boundary, numTraj=1)
@@ -261,7 +261,6 @@ class ParticleTracing(object):
             if z > endPos:
                 # Linearly backtrack to boundary
                 simTime -= (z-endPos) / vz
-
                 z = endPos
                 x -= (z-endPos)/(vz * dt) * (vx * dt)
                 y -= (z-endPos)/(vz * dt) * (vy * dt)
@@ -299,8 +298,8 @@ class ParticleTracing(object):
 
         # Density is so low that collision frequency is ~0, just don't collide
         else:
-            no_collide = True
             dt = prev_dt
+            no_collide = True
 
         return dt, no_collide
 
@@ -362,12 +361,10 @@ class ParticleTracing(object):
             Vz = self._fVz(z0, (x0**2 + y0**2)**0.5)[0][0]
             vr = self._fVr(z0, (x0**2 + y0**2)**0.5)[0][0]
             vPerpCw = self._fVp(z0, (x0**2 + y0**2)**0.5)[0][0]
-
             theta = np.arctan2(y0, x0)
             rot = np.pi/2 - theta
             Vx = np.cos(rot) * vPerpCw + np.sin(rot) * vr
             Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
-
             return np.array([Vx, Vy, Vz])
 
 
@@ -533,7 +530,27 @@ class ParticleTracing(object):
 
         return vx, vy, vz
 
+    def showWalls(self, outfile):
+        '''
+        Generate a scatter plot of final positions of molecules as determined by
+        the endPosition function parameters.
+        '''
+        print("Started showWalls")
 
+        particleNum = self._PARTICLE_NUMBER
+        default_endPos = self._knownGeometries[self._geometry][1]
+
+        #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
+        inputs = np.ones(particleNum) * default_endPos
+
+        results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
+    #    with Pool(processes=100) as pool:
+    #        results = pool.map(endPosition, inputs, 1)
+
+        f = open(outfile, "w+")
+        f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
+        f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
+        f.close()
 
 def get_flow_chars(filename):
     '''
@@ -710,65 +727,6 @@ def inBounds(x, y, z, cell=None, endPos=0.12):
         raise ValueError('Could not find bounds for geometry {}'.format(cell))
 
 
-
-
-#
-# def updateParams(x, y, z, form='box'):
-#     setAmbientFlow(x, y, z, form)
-#     setAmbientDensity(x, y, z, form)
-#     setAmbientTemp(x, y, z, form)
-#     set_derived_quants()
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-
-# =============================================================================
-# Simulation & Data Retrieval
-# =============================================================================
-
-
-
-# =============================================================================
-# Iterating endPosition
-# =============================================================================
-
-def showWalls():
-    '''
-    Generate a scatter plot of final positions of molecules as determined by
-    the endPosition function parameters.
-    '''
-    print("Started showWalls")
-    print("Running flowfield %s"%FF)
-    print("Simulating {0} particles, cross-section multiplier {1}".format(PARTICLE_NUMBER, crossMult))
-
-    f = open(outfile, "w+")
-
-    global geometry, INIT_MODE, PROBE_MODE, default_aperture
-
-    particleNum = self._PARTICLE_NUMBER
-    cellGeometry = self._geometry
-    default_aperture = self._knownGeometries[cellGeometry][0]
-    default_endPos = self._knownGeometries[cellGeometry][1]
-
-    #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
-    inputs = np.ones(particleNum) * default_endPos
-
-    results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(get_trajectory)(i) for i in inputs)
-#    with Pool(processes=100) as pool:
-#        results = pool.map(endPosition, inputs, 1)
-    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
-    f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
-    f.close()
-
-# =============================================================================
-# Had to wrap the script into a main method, otherwise parallelization ran
-# into issues when running the program on Windows
-# =============================================================================
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Specify simulation params')
@@ -798,10 +756,9 @@ if __name__ == '__main__':
     print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_MODE {3}".format(NPAR, crossMult, LITE_MODE, INIT_MODE))
     print("PROBE_MODE {}".format(PROBE_MODE))
 
-
-    results = sim.nonparallel_main()
-
-    f = open(outfile, 'w+')
-    f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
-    f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
-    f.close()
+    sim.showWalls(outfile)
+    # results = sim.nonparallel_main()
+    # f = open(outfile, 'w+')
+    # f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
+    # f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
+    # f.close()
