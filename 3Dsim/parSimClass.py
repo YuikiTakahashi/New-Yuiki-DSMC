@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
 Created August 2019
@@ -42,11 +42,11 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName, NPAR, crossMult, LITE_MODE, INIT_MODE, PROBE_MODE):
+    def __init__(self, flowFieldName, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, OPTIMIZATION):
 
         #Set as 1 for basic vel_pdf (default prior to 08/2019)
         #Set as 2 for vel_corrected_pdf
-        self._SIMPLE_FLAG = 1
+        self._OPTIMIZATION = OPTIMIZATION
 
         #Label all known geometries and map to a tuple (default_aperture, default_endPos)
         #  1. default_aperture: gives the z position (mm) of what we take to be the aperture \
@@ -67,17 +67,17 @@ class ParticleTracing(object):
                            'rCell' : (0.064, 0.12)\
                            }
 
-        #Probability of collision, set at 1/10. Higher probability means coarser time-step
+        #Probability of collision, set at 1/10. Higher probability means finer time-step
         self._collProb = 0.1
 
         self._FF = flowFieldName
         self._PARTICLE_NUMBER = NPAR
         self._CROSS_MULT = crossMult
         self._LITE_MODE = LITE_MODE
-        self._INIT_MODE = INIT_MODE
+        self._INIT_COND = INIT_COND
         self._PROBE_MODE = PROBE_MODE
 
-        #
+
         # self._T = 4 # Ambient helium temperature (K)
         # self._Ts = 4 # Molecular species temperature (K), used for initial velocity distributions
         #
@@ -105,7 +105,7 @@ class ParticleTracing(object):
             #Geometry is a string in ['fCell', 'gCell', 'hCell', ..., 'pCell', 'rCell', ...]
             #Flowrate is an integer in [2, 5, ..., 200] (SCCM)
             ###################
-            #CLEAN UP!!
+            #CLEAN UP!
             ###################
             geometry, flowrate = get_flow_chars(self._FF)
 
@@ -165,7 +165,7 @@ class ParticleTracing(object):
         Uses parallelization library to compute several molecule
         trajectories.
         '''
-        print("SIMPLE_FLAG = {}".format(self._SIMPLE_FLAG))
+        print("OPTIMIZATION = {}".format(self._OPTIMIZATION))
 
         particleNum = self._PARTICLE_NUMBER
         cellGeometry = self._geometry
@@ -180,7 +180,7 @@ class ParticleTracing(object):
 
 
     def nonparallel_main(self):
-        print("SIMPLE_FLAG = {}".format(self._SIMPLE_FLAG))
+        print("OPTIMIZATION = {}".format(self._OPTIMIZATION))
 
         particleNum = self._PARTICLE_NUMBER
         cellGeometry = self._geometry
@@ -210,7 +210,7 @@ class ParticleTracing(object):
         # If true, only write data to file once at the beginning, and when close
         # to aperture, i.e. don't record particle trajectory for most of the inner
         # cell. This is to make the output files lighter.
-        LITE_MODE = self._INIT_MODE
+        LITE_MODE = self._LITE_MODE
 
         # If true, only write two lines per particle: initial and final
         PROBE_MODE = self._PROBE_MODE
@@ -348,6 +348,8 @@ class ParticleTracing(object):
     def dsmc_quant(self, x0, y0, z0, quant):
         '''
         Return quantity (quant) evaluated at the given location in the cell.
+
+        Note: density is stored as log(dens) in self._fDens, so need to return exp().
         '''
         if quant == 'dens':
             logdens = self._fDens(z0, (x0**2 + y0**2)**0.5)[0][0]
@@ -371,14 +373,14 @@ class ParticleTracing(object):
     def initial_species_position(self):
         '''
         Return a random initial position for the molecule.
-        Distribution of possible locations depends on which INIT_MODE is active.
-        * INIT_MODE 0: (Small) Cylinder. 10mm x 4mm
-        * INIT_MODE 1: (Default) Cylinder. 10mm x 8mm
-        * INIT_MODE 2: 5000K ablation
-        * INIT_MODE 9: Full cell F
-        * INIT_MODE 11: Full cell H
+        Distribution of possible locations depends on which INIT_COND is active.
+        * INIT_COND 0: (Small) Cylinder. 10mm x 4mm
+        * INIT_COND 1: (Default) Cylinder. 10mm x 8mm
+        * INIT_COND 2: 5000K ablation
+        * INIT_COND 9: Full cell F
+        * INIT_COND 11: Full cell H
         '''
-        mode = self._INIT_MODE
+        mode = self._INIT_COND
 
         #Larger initial distribution of particles
         if mode==1:
@@ -417,7 +419,7 @@ class ParticleTracing(object):
             z = np.random.uniform(0.035,0.040)
 
         else:
-            raise ValueError('Did not recognize INIT_MODE {}'.format(mode))
+            raise ValueError('Did not recognize INIT_COND {}'.format(mode))
 
         return x, y, z
 
@@ -426,34 +428,36 @@ class ParticleTracing(object):
         Given species temperature, return randomized (Boltzmann) speed in a
         randomized (spherically uniform) direction.
 
-        * INIT_MODE 0: 4K thermal velocity distribution, spherically uniform
-        * INIT_MODE 1: ditto
-        * INIT_MODE 9: ditto
-        * INIT_MODE 11: ditto
+        * INIT_COND 0: 4K thermal velocity distribution, spherically uniform
+        * INIT_COND 1: ditto
+        * INIT_COND 9: ditto
+        * INIT_COND 11: ditto
 
-        * INIT_MODE 2: 5000K thermal velocity distribution, straight out from cell wall
+        * INIT_COND 2: 5000K thermal velocity distribution, straight out from cell wall
         '''
         # global T_s
-        mode = self._INIT_MODE
+        mode = self._INIT_COND
         #These initial conditions assume the molecules begin thermalized with the 4K environment
         if mode in [0, 1, 9, 11]:
             species_temp = 4
+
+            if self._OPTIMIZATION == 0:
+                Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
+                Vy = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
+                Vz = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
+
+            else:
+                v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
+                theta = self._theta_cv.rvs()
+                phi = np.random.uniform(0, 2*np.pi)
+                Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                                   *np.sin(phi), v0*np.cos(theta))
 
         #This initial condition is meant to approximate the post-ablation species
         #velocity distribution
         elif mode in [2]:
             species_temp = 5000
-
-        v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
-
-        if mode in [0,1,9,11]:
-
-            theta = self._theta_cv.rvs()
-            phi = np.random.uniform(0, 2*np.pi)
-            Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                               *np.sin(phi), v0*np.cos(theta))
-        elif mode in [2]:
-
+            v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
             Vx, Vy, Vz = v0, 0, 0
 
         return Vx, Vy, Vz
@@ -473,9 +477,16 @@ class ParticleTracing(object):
         xFlow, yFlow, zFlow = v_flow[0], v_flow[1], v_flow[2]
         vx, vy, vz = v_mol[0], v_mol[1], v_mol[2]
 
-        simple = self._SIMPLE_FLAG
+        simple = self._OPTIMIZATION
 
-        if simple == 1:
+        if simple == 0:
+
+            vxGas = xFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
+            vyGas = yFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
+            vzGas = zFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
+            return vxGas - vx, vyGas - vy, vzGas - vz
+
+        elif simple == 1:
             v0 = self._max_boltz_cv.rvs(m=M_HE, T=temp)
             theta = self._theta_cv.rvs()
             phi = np.random.uniform(0, 2*np.pi)
@@ -495,7 +506,33 @@ class ParticleTracing(object):
             return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
         else:
-            raise ValueError('Unknown SIMPLE_FLAG')
+            raise ValueError('Unknown OPTIMIZATION')
+
+    def particle_generator(self, prop='He_Thermal_Vel', T=None):
+        '''
+        Generates (i.e. samples) a selected particle property.
+
+
+        Arguments:
+
+        prop: property to be generated. Must be one of
+                * 'He_Thermal_Vel': helium particle thermal speed (1 dimensional)
+                * 'Mol_Thermal_Vel': molecular species thermal speed (1 dimensional)
+                * 'Radial Position'
+
+        T: temperature (required if generating a thermal velocity)
+        '''
+
+        if prop in ['He_Thermal_Vel', 'Mol_Thermal_Vel']:
+
+            m = {'He_Thermal_Vel':M_HE, 'Mol_Thermal_Vel':M_S}[prop]
+            k = KB
+            coef = np.sqrt(2*k*T/m)
+
+            r1, r2 = np.random.uniform(0,1,size=2)
+
+            v = coef * np.sin(2*np.pi*r1) * np.sqrt(-1*np.log(r2))
+            return v
 
 
     def collide(self, temp, v_flow, v_mol):
@@ -623,13 +660,10 @@ class Theta_pdf(st.rv_continuous):
 #==============================================================================
 
 
-
-
-
 def inBounds(x, y, z, cell=None, endPos=0.12):
     '''
     Return Boolean value for whether or not a position is within
-    the boundary of "form".
+    the boundary of "cell".
     '''
     r = np.sqrt(x**2+y**2)
 
@@ -730,8 +764,8 @@ def inBounds(x, y, z, cell=None, endPos=0.12):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Specify simulation params')
-    parser.add_argument('-ff', '--one', metavar='flows/X_Cell/DS2xyyy.DAT', help='File containing flowfield from DS2V output') # Specify flowfield
-    parser.add_argument('-out', '--two', metavar='xyyy.dat', help = 'Output file name, to store trajectory data') # Specify output filename
+    parser.add_argument('-ff', metavar='flows/X_Cell/DS2xyyy.DAT', help='File containing flowfield from DS2V output') # Specify flowfield
+    parser.add_argument('-out', metavar='xyyy.dat', help = 'Output file name, to store trajectory data') # Specify output filename
 
     parser.add_argument('--mult', type=float, dest='mult', action='store', help='Multiplier for the collision cross section') # Specify cross section multiplier (optional)
     parser.add_argument('--npar', type=int, dest='npar', action='store', help='Number of particles to simulate') #Specify number of particles to simulate (optional, defaults to 1)
@@ -742,18 +776,20 @@ if __name__ == '__main__':
     parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
-    flowField = args.one
-    outfile = args.two
+    flowField = args.ff
+    outfile = args.out
 
     NPAR = args.npar
     crossMult = args.mult
     LITE_MODE = args.lite
-    INIT_MODE = args.init_mode
+    INIT_COND = args.init_mode
     PROBE_MODE = args.probe_mode
 
-    sim = ParticleTracing(flowField, NPAR, crossMult, LITE_MODE, INIT_MODE, PROBE_MODE)
+    OPTIM = 1 #OPTIM=1 sets which distributions/sampling methods are to be used in sampling particle data
 
-    print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_MODE {3}".format(NPAR, crossMult, LITE_MODE, INIT_MODE))
+    sim = ParticleTracing(flowField, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, OPTIM)
+
+    print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_COND {3}".format(NPAR, crossMult, LITE_MODE, INIT_COND))
     print("PROBE_MODE {}".format(PROBE_MODE))
 
     sim.showWalls(outfile)
