@@ -24,6 +24,7 @@ KB = 1.38 * 10**-23 #Boltzmann
 NA = 6.022 * 10**23 #Avogadro
 M_HE = 0.004 / NA # Helium gas particle mass (kg)
 M_S = .190061 / NA # Species mass (kg)
+M_RED = (M_HE * M_S) / (M_HE + M_S)
 MASS_PARAM = 2 * M_HE / (M_HE + M_S)
 
 # self._m = 0.004 / NA # Helium gas particle mass (kg)
@@ -439,19 +440,17 @@ class ParticleTracing(object):
         mode = self._INIT_COND
         #These initial conditions assume the molecules begin thermalized with the 4K environment
         if mode in [0, 1, 9, 11]:
-            species_temp = 4
+            T_s = 4.0 #species temperature: assume 4K thermalization
 
-            if self._OPTIMIZATION == 0:
-                Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
-                Vy = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
-                Vz = self.particle_generator(prop='Mol_Thermal_Vel', T=species_temp)
+            Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
+            Vy = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
+            Vz = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
 
-            else:
-                v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
-                theta = self._theta_cv.rvs()
-                phi = np.random.uniform(0, 2*np.pi)
-                Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                                   *np.sin(phi), v0*np.cos(theta))
+            # v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
+            # theta = self._theta_cv.rvs()
+            # phi = np.random.uniform(0, 2*np.pi)
+            # Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+            #                    *np.sin(phi), v0*np.cos(theta))
 
         #This initial condition is meant to approximate the post-ablation species
         #velocity distribution
@@ -533,6 +532,23 @@ class ParticleTracing(object):
 
             v = coef * np.sin(2*np.pi*r1) * np.sqrt(-1*np.log(r2))
             return v
+
+        elif prop == 'Coll_Rel_Speed':
+            '''
+            Use accept-reject generating techique, from Boyd
+            '''
+
+            m = M_RED #Reduced mass, since we are in COM frame
+            k = KB
+            fMax = 1.5 * np.sqrt(3*m/(k*T)) * np.exp(-1.5) #Maximum value of PDF
+
+            while True:
+                y, u = np.random.uniform(low=0,high=1,size=2)
+                f_y = (m**2)/(2 * KB**2 * T**2) * y**3 * np.exp(-m*y**2/(2*KB*T)) #PDF for relative speed, evaluated at y
+                if u <= f_y / fMax:
+                    return y
+
+
 
 
     def collide(self, temp, v_flow, v_mol):
@@ -631,7 +647,7 @@ class AmbientCorrected_pdf(st.rv_continuous):
     cross section.
     '''
     def _pdf(self, x, T):
-        m = M_HE
+        m = M_HE #Should be changed to reduced mass?
         return (m**2)/(2 * KB**2 * T**2) * x**3 * np.exp(-m*x**2/(2*KB*T)) #extra factor of v
 
 # Maxwell-Boltzmann Velocity Distribution for species molecules
@@ -773,7 +789,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--init_mode', type=int, dest='init_mode', action='store', help='Code number for initial particle distributions')
     parser.add_argument('--probe_mode', dest='probe_mode', action='store_true', help='Set TRUE if only particles final locations are needed')
-    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
+    parser.add_argument('--optim', dest='optim', action='store', help='Specify which technique to use for generating random particle data')
+    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False, optim=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
     flowField = args.ff
