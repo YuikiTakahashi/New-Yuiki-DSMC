@@ -437,9 +437,9 @@ class ParticleTracing(object):
         * INIT_COND 2: 5000K thermal velocity distribution, straight out from cell wall
         '''
         # global T_s
-        mode = self._INIT_COND
+        init_cond = self._INIT_COND
         #These initial conditions assume the molecules begin thermalized with the 4K environment
-        if mode in [0, 1, 9, 11]:
+        if init_cond in [0, 1, 9, 11]:
             T_s = 4.0 #species temperature: assume 4K thermalization
 
             Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
@@ -452,12 +452,18 @@ class ParticleTracing(object):
             # Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
             #                    *np.sin(phi), v0*np.cos(theta))
 
-        #This initial condition is meant to approximate the post-ablation species
-        #velocity distribution
-        elif mode in [2]:
-            species_temp = 5000
-            v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
-            Vx, Vy, Vz = v0, 0, 0
+
+        elif init_cond in [2]:
+            '''
+            Approximates post-ablation species
+            velocity distribution
+            '''
+            T_s = 5000
+            Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
+            Vy, Vz = 0, 0
+
+            # v0 = self._max_boltz_cv.rvs(m=M_S, T=species_temp)
+            # Vx, Vy, Vz = v0, 0, 0
 
         return Vx, Vy, Vz
 
@@ -478,20 +484,19 @@ class ParticleTracing(object):
 
         simple = self._OPTIMIZATION
 
-        if simple == 0:
+        if simple == 1:
 
             vxGas = xFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
             vyGas = yFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
             vzGas = zFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
             return vxGas - vx, vyGas - vy, vzGas - vz
 
-        elif simple == 1:
-            v0 = self._max_boltz_cv.rvs(m=M_HE, T=temp)
-            theta = self._theta_cv.rvs()
-            phi = np.random.uniform(0, 2*np.pi)
-            Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                               *np.sin(phi), v0*np.cos(theta))
-            return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+            # v0 = self._max_boltz_cv.rvs(m=M_HE, T=temp)
+            # theta = self._theta_cv.rvs()
+            # phi = np.random.uniform(0, 2*np.pi)
+            # Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+            #                    *np.sin(phi), v0*np.cos(theta))
+            # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
         #Slightly more refined case. Rather than sample from a regular Maxwell-Boltzmann,
         #we attach an extra factor of v to the PDF, to account for collision frequency depending
@@ -535,10 +540,11 @@ class ParticleTracing(object):
 
         elif prop == 'Coll_Rel_Speed':
             '''
-            Use accept-reject generating techique, from Boyd
+            Generate relative speed between colliding particles,
+            in COM frame. Uses accept-reject technique.
             '''
 
-            m = M_RED #Reduced mass, since we are in COM frame
+            m = M_RED #Reduced mass using helium and molecular masses
             k = KB
             fMax = 1.5 * np.sqrt(3*m/(k*T)) * np.exp(-1.5) #Maximum value of PDF
 
