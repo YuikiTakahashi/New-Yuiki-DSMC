@@ -19,6 +19,7 @@ import joblib.parallel
 ###############################################################################
 # CONSTANTS
 ###############################################################################
+BOYD = 0
 
 KB = 1.38 * 10**-23 #Boltzmann
 NA = 6.022 * 10**23 #Avogadro
@@ -482,9 +483,12 @@ class ParticleTracing(object):
         xFlow, yFlow, zFlow = v_flow[0], v_flow[1], v_flow[2]
         vx, vy, vz = v_mol[0], v_mol[1], v_mol[2]
 
-        simple = self._OPTIMIZATION
+        optim = self._OPTIMIZATION
 
-        if simple == 1:
+        if optim == 1:
+            '''
+            Simplest case: use unbiased Maxwell-Boltzmann thermal velocity distribution
+            '''
 
             vxGas = xFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
             vyGas = yFlow + self.particle_generator(prop='He_Thermal_Vel', T=temp)
@@ -498,16 +502,29 @@ class ParticleTracing(object):
             #                    *np.sin(phi), v0*np.cos(theta))
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
-        #Slightly more refined case. Rather than sample from a regular Maxwell-Boltzmann,
-        #we attach an extra factor of v to the PDF, to account for collision frequency depending
-        #on relative velocity, but approximate the molecule speed as negligible.
-        elif simple == 2:
-            v0 = self._vel_ambient_cv.rvs(T=temp)
-            theta = self._theta_cv.rvs()
-            phi = np.random.uniform(0, 2*np.pi)
-            Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                               *np.sin(phi), v0*np.cos(theta))
-            return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+
+        elif optim == 2:
+            '''
+            "Biased" thermal speed distribution. An extra factor of v enters the PDF,
+            accounting for the velocity-dependent probability of collision.
+            Assumes spherical symmetry as an approximation.
+            '''
+
+            if BOYD == False:
+
+                v0 = self._vel_ambient_cv.rvs(T=temp)
+                theta = self._theta_cv.rvs()
+                phi = np.random.uniform(0, 2*np.pi)
+                Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                                   *np.sin(phi), v0*np.cos(theta))
+                return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+
+
+            elif BOYD == True:
+                vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
+                vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
+                vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
+                return vxGas - vx, vyGas - vy, vzGas - vz
 
         else:
             raise ValueError('Unknown OPTIMIZATION')
@@ -516,13 +533,12 @@ class ParticleTracing(object):
         '''
         Generates (i.e. samples) a selected particle property.
 
-
         Arguments:
-
         prop: property to be generated. Must be one of
                 * 'He_Thermal_Vel': helium particle thermal speed (1 dimensional)
                 * 'Mol_Thermal_Vel': molecular species thermal speed (1 dimensional)
-                * 'Radial Position'
+                * 'Radial Position':
+                * 'Coll_Rel_Speed': relative speed of colliding particles (with bias)
 
         T: temperature (required if generating a thermal velocity)
         '''
