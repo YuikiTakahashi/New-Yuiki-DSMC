@@ -44,7 +44,7 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, OPTIMIZATION):
+    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, crossMult=5, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, OPTIMIZATION=2):
 
         #Set as 1 for basic vel_pdf (default prior to 08/2019)
         #Set as 2 for vel_corrected_pdf
@@ -521,9 +521,9 @@ class ParticleTracing(object):
 
 
             elif BOYD == True:
-                vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
-                vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
-                vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Speed', T=temp)
+                vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+                vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+                vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
                 return vxGas - vx, vyGas - vy, vzGas - vz
 
         else:
@@ -531,16 +531,20 @@ class ParticleTracing(object):
 
     def particle_generator(self, prop='He_Thermal_Vel', T=None):
         '''
-        Generates (i.e. samples) a selected particle property.
+        Generates a selected particle property from the appropriate distribution.
 
-        Arguments:
+        Args:
         prop: property to be generated. Must be one of
                 * 'He_Thermal_Vel': helium particle thermal speed (1 dimensional)
                 * 'Mol_Thermal_Vel': molecular species thermal speed (1 dimensional)
                 * 'Radial Position':
-                * 'Coll_Rel_Speed': relative speed of colliding particles (with bias)
+                * 'Coll_Rel_Vel': relative speed of colliding particles (with bias)
 
         T: temperature (required if generating a thermal velocity)
+
+        Returns:
+        a velocity v (float), if prop is one of 'He_Thermal_Vel', 'Mol_Thermal_Vel',
+        or 'Coll_Rel_Vel'.
         '''
 
         if prop in ['He_Thermal_Vel', 'Mol_Thermal_Vel']:
@@ -554,21 +558,30 @@ class ParticleTracing(object):
             v = coef * np.sin(2*np.pi*r1) * np.sqrt(-1*np.log(r2))
             return v
 
-        elif prop == 'Coll_Rel_Speed':
+        elif prop == 'Coll_Rel_Vel':
             '''
             Generate relative speed between colliding particles,
             in COM frame. Uses accept-reject technique.
             '''
 
-            m = M_RED #Reduced mass using helium and molecular masses
-            k = KB
-            fMax = 1.5 * np.sqrt(3*m/(k*T)) * np.exp(-1.5) #Maximum value of PDF
+            #Uses reduced mass \mu, of helium and molecular masses
+            m = M_RED
 
-            while True:
-                y, u = np.random.uniform(low=0,high=1,size=2)
-                f_y = (m**2)/(2 * KB**2 * T**2) * y**3 * np.exp(-m*y**2/(2*KB*T)) #PDF for relative speed, evaluated at y
-                if u <= f_y / fMax:
-                    return y
+            #Mean thermal velocity, used only to set the bounds of the PDF
+            vMean = 2 * (2 * KB * T / (m * np.pi))**0.5
+
+            #Maximum value of PDF
+            fMax = 1.5 * np.sqrt(3*m/(KB*T)) * np.exp(-1.5)
+
+            #Set the PDF as the collision velocity distribution with fixed temperature
+            f = lambda x: collisionVelPDF(x, T=T)
+
+            #Sample the PDF using accept-reject algorithm. The upper bound on the velocity
+            #PDF is set at vMax = 5*vMean. This value is chosen because at a speed of
+            #5 times vMean, the probability density should be negligible.
+            v = accept_reject_gen(pdf=f, xmin=0, xmax=5*vMean, pmax=fMax)
+            return v[0]
+            # G(lambda x: F(x, C))
 
 
 
@@ -693,9 +706,63 @@ class Theta_pdf(st.rv_continuous):
     def _pdf(self,x):
         return -np.cos(x)  # Normalized over its range [pi/2, pi]
 
-#==============================================================================
-#Form-dependent parameter setup, must have axis-of-symmetry "wall" data
-#==============================================================================
+def collisionVelPDF(x, T, m=M_RED):
+    return (m**2)/(2 * KB**2 * T**2) * x**3 * np.exp(-m*x**2/(2*KB*T)) #PDF for relative speed, evaluated at y
+
+
+def accept_reject_gen(pdf, n=1, xmin=0, xmax=1, pmax=None):
+  """
+ Rejection method for random number generation
+ ===============================================
+ Uses the rejection method for generating random numbers derived from an arbitrary
+ probability distribution.
+
+ Usage:
+ >>> randomvariate(f,n,xmin,xmax)
+  where
+  f : probability distribution function from which you want to generate random numbers
+  n : desired number of random values
+  xmin,xmax : range of random numbers desired
+
+ Returns:
+  the sequence (ran,ntrials) where
+   ran : array of shape N with the random variates that follow the input P
+   ntrials : number of trials the code needed to achieve N
+
+ Here is the algorithm:
+ - generate x' in the desired range
+ - generate y' between Pmin and Pmax (Pmax is the maximal value of your pdf)
+ - if y'<P(x') accept x', otherwise reject
+ - repeat until desired number is achieved
+  """
+  # Calculates the minimal and maximum values of the PDF in the desired
+  # interval. The rejection method needs these values in order to work
+  # properly.
+  pmin=0.
+
+  if pmax==None:
+      x=np.linspace(xmin,xmax,1000)
+      y=pdf(x)
+      pmax=y.max()
+
+  # Counters
+  naccept=0
+  ntrial=0
+
+  # Keeps generating numbers until we achieve the desired n
+  ran=[] # output list of random numbers
+  while naccept<n:
+      x=np.random.uniform(xmin,xmax) # x'
+      y=np.random.uniform(pmin,pmax) # y'
+
+      if y<pdf(x):
+          ran.append(x)
+          naccept += 1
+      ntrial += 1
+
+  ran=np.asarray(ran)
+
+  return ran
 
 
 def inBounds(x, y, z, cell=None, endPos=0.12):
