@@ -1,4 +1,4 @@
-#!/usr/bin/python
+corrected#!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
 Created August 2019
@@ -19,7 +19,6 @@ import joblib.parallel
 ###############################################################################
 # CONSTANTS
 ###############################################################################
-BOYD = 0
 
 KB = 1.38 * 10**-23 #Boltzmann
 NA = 6.022 * 10**23 #Avogadro
@@ -44,11 +43,11 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, crossMult=5, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, OPTIMIZATION=2):
+    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, crossMult=5, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=1):
 
         #Set as 1 for basic vel_pdf (default prior to 08/2019)
         #Set as 2 for vel_corrected_pdf
-        self._OPTIMIZATION = OPTIMIZATION
+        self._CORRECTION = CORRECTION
 
         #Label all known geometries and map to a tuple (default_aperture, default_endPos)
         #  1. default_aperture: gives the z position (mm) of what we take to be the aperture \
@@ -167,7 +166,7 @@ class ParticleTracing(object):
         Uses parallelization library to compute several molecule
         trajectories.
         '''
-        print("OPTIMIZATION = {}".format(self._OPTIMIZATION))
+        print("CORRECTION = {}".format(self._CORRECTION))
 
         particleNum = self._PARTICLE_NUMBER
         cellGeometry = self._geometry
@@ -182,7 +181,7 @@ class ParticleTracing(object):
 
 
     def nonparallel_main(self):
-        print("OPTIMIZATION = {}".format(self._OPTIMIZATION))
+        print("CORRECTION = {}".format(self._CORRECTION))
 
         particleNum = self._PARTICLE_NUMBER
         cellGeometry = self._geometry
@@ -382,6 +381,8 @@ class ParticleTracing(object):
         * INIT_COND 9: Full cell F
         * INIT_COND 11: Full cell H
         '''
+        #Retrieve which pre-specified type of initial conditions
+        #were chosen for this simulation
         mode = self._INIT_COND
 
         #Larger initial distribution of particles
@@ -483,9 +484,9 @@ class ParticleTracing(object):
         xFlow, yFlow, zFlow = v_flow[0], v_flow[1], v_flow[2]
         vx, vy, vz = v_mol[0], v_mol[1], v_mol[2]
 
-        optim = self._OPTIMIZATION
+        correc = self._CORRECTION
 
-        if optim == 1:
+        if correc == 0:
             '''
             Simplest case: use unbiased Maxwell-Boltzmann thermal velocity distribution
             '''
@@ -503,31 +504,27 @@ class ParticleTracing(object):
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
 
-        elif optim == 2:
+        elif corrected == 1:
             '''
             "Biased" thermal speed distribution. An extra factor of v enters the PDF,
             accounting for the velocity-dependent probability of collision.
             Assumes spherical symmetry as an approximation.
             '''
 
-            if BOYD == False:
+            # v0 = self._vel_ambient_cv.rvs(T=temp)
+            # theta = self._theta_cv.rvs()
+            # phi = np.random.uniform(0, 2*np.pi)
+            # Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+            #                    *np.sin(phi), v0*np.cos(theta))
+            # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
-                v0 = self._vel_ambient_cv.rvs(T=temp)
-                theta = self._theta_cv.rvs()
-                phi = np.random.uniform(0, 2*np.pi)
-                Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                                   *np.sin(phi), v0*np.cos(theta))
-                return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
-
-
-            elif BOYD == True:
-                vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
-                vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
-                vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
-                return vxGas - vx, vyGas - vy, vzGas - vz
+            vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+            vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+            vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+            return vxGas - vx, vyGas - vy, vzGas - vz
 
         else:
-            raise ValueError('Unknown OPTIMIZATION')
+            raise ValueError('Unknown CORRECTION')
 
     def particle_generator(self, prop='He_Thermal_Vel', T=None):
         '''
@@ -577,12 +574,9 @@ class ParticleTracing(object):
             f = lambda x: collisionVelPDF(x, T=T)
 
             #Sample the PDF using accept-reject algorithm. The upper bound on the velocity
-            #PDF is set at vMax = 5*vMean. This value is chosen because at a speed of
-            #5 times vMean, the probability density should be negligible.
+            #PDF is set at vMax=5*vMean, where the probability density should be negligible.
             v = accept_reject_gen(pdf=f, xmin=0, xmax=5*vMean, pmax=fMax)
             return v[0]
-            # G(lambda x: F(x, C))
-
 
 
 
@@ -625,15 +619,16 @@ class ParticleTracing(object):
         '''
         print("Started showWalls")
 
-        particleNum = self._PARTICLE_NUMBER
+        #The knownGeometries array stores the default end position for each geometry
+        #as one of the parameters.
         default_endPos = self._knownGeometries[self._geometry][1]
 
-        #N=(PARTICLE_NUMBER) different jobs, each with the parameter endPos set to default_endPos
-        inputs = np.ones(particleNum) * default_endPos
+        #N=(PARTICLE_NUMBER) jobs, each with the parameter endPos set to default_endPos
+        inputs = np.ones(self._PARTICLE_NUMBER) * default_endPos
 
         results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
-    #    with Pool(processes=100) as pool:
-    #        results = pool.map(endPosition, inputs, 1)
+        #    with Pool(processes=100) as pool:
+        #        results = pool.map(endPosition, inputs, 1)
 
         f = open(outfile, "w+")
         f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
@@ -878,8 +873,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--init_mode', type=int, dest='init_mode', action='store', help='Code number for initial particle distributions')
     parser.add_argument('--probe_mode', dest='probe_mode', action='store_true', help='Set TRUE if only particles final locations are needed')
-    parser.add_argument('--optim', dest='optim', action='store', help='Specify which technique to use for generating random particle data')
-    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False, optim=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
+    # parser.add_argument('--correc', dest='correc', action='store', help='Specify whether to use *corrected* velocity distribution')
+    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False, correc=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
     args = parser.parse_args()
 
     flowField = args.ff
@@ -891,9 +886,9 @@ if __name__ == '__main__':
     INIT_COND = args.init_mode
     PROBE_MODE = args.probe_mode
 
-    OPTIM = 1 #OPTIM=1 sets which distributions/sampling methods are to be used in sampling particle data
+    CORRECTION = 1 #CORRECTION=1 sets which distributions/sampling methods are to be used in sampling particle data
 
-    sim = ParticleTracing(flowField, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, OPTIM)
+    sim = ParticleTracing(flowField, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, CORRECTION)
 
     print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_COND {3}".format(NPAR, crossMult, LITE_MODE, INIT_COND))
     print("PROBE_MODE {}".format(PROBE_MODE))
