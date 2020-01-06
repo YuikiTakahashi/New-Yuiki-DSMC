@@ -131,504 +131,504 @@ Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for 
 # =============================================================================
 # Must have axis-of-symmetry "wall" data in FF for this to work.
 # =============================================================================
-try:
-    raise # Skip data loading when only want file analysis function
-    flowField = np.loadtxt('flows/DS2FF019.DAT', skiprows=1) # Assumes only first row isn't data.
-    zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
-    vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
-    quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
-    grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
-    # The high grid density increases overhead time for running this initialization,
-    # but the time for running particle simulations is unaffected.
-    grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
-    grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
-    grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
-    grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
-    grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
-    # The 'nearest' gridding has not been thoroughly tested for edge-case accuracy.
-    # These are interpolation functions:
-    f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
-    f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
-    f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
-    f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
-    f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
-except:
-    print("Note: No Flow Field DSMC data.")
-
-def dsmcQuant(x0, y0, z0, func):
-    quant0 = func(z0, (x0**2 + y0**2)**0.5)[0][0]
-    if func == f3:
-        Vz = quant0
-        vr = dsmcQuant(x0, y0, z0, f4)
-        vPerpCw = dsmcQuant(x0, y0, z0, f5)
-
-        theta = np.arctan2(y0, x0)
-        rot = np.pi/2 - theta
-        Vx = np.cos(rot) * vPerpCw + np.sin(rot) * vr
-        Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
-        return Vx, Vy, Vz
-    if func == f1:
-        return np.exp(quant0)
-    return quant0
-
-def inBounds(x, y, z, form='box', endPos=0.12):
-    '''
-    Return Boolean value for whether or not a position is within
-    the boundary of "form".
-    '''
-    if form in ['box', 'curvedFlowBox']:
-        inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
-    elif form == 'currentCell':
-        r = np.sqrt(x**2+y**2)
-        in1 = r < 0.00635 and z > 0.015 and z < 0.0635
-        in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
-        in3 = r < 0.030 and z >= 0.0640 and z < endPos
-        inside = in1 + in2 + in3
-    return inside
-
-def setAmbientFlow(x, y, z, form='box'):
-    '''
-    Given position of species molecule, set ambient flow velocities to known
-    (DSMC-generated) local values.
-    '''
-    global xFlow, yFlow, zFlow
-    if form in ['box', 'open']:
-        xFlow, yFlow, zFlow = 0, 0, 0
-    elif form == 'curvedFlowBox':
-        r = (x**2+y**2)**0.5
-        radFlow = -5*z*np.exp(-0.4*abs(5*z+1)) * 100 * r
-        xFlow = x * radFlow / r * 100
-        yFlow = y * radFlow / r * 100
-        zFlow = 0.2 * 100
-    elif form == 'currentCell':
-        xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
-        if abs(xFlow) > 1000:
-            print(x, y, z, xFlow, 'm/s')
-
-def setAmbientDensity(x, y, z, form='box'):
-    '''
-    Given position of species molecule, set ambient density to known
-    (DSMC-generated) local value.
-    '''
-    global n
-    if form in ['box', 'curvedFlowBox', 'open']:
-        n = n
-    elif form == 'currentCell':
-        n = dsmcQuant(x, y, z, f1)
-        if abs(n) > 1e26:
-            print(x, y, z, n, 'm-3')
-
-def setAmbientTemp(x, y, z, form='box'):
-    '''
-    Given position of species molecule, set ambient temperature to known
-    (DSMC-generated) local value.
-    '''
-    global T
-    if form in ['box', 'curvedFlowBox', 'open']:
-        T = T
-    elif form == 'currentCell':
-        T = dsmcQuant(x, y, z, f2)
-        if abs(T) > 500:
-            print(x, y, z, T, 'K')
-
-def updateParams(x, y, z, form='box'):
-    setAmbientFlow(x, y, z, form)
-    setAmbientDensity(x, y, z, form)
-    setAmbientTemp(x, y, z, form)
-    set_derived_quants()
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-def coll_vel_index_pdf(x, y, z, p, w):
-    '''
-    Here, indices x, y, z are linearly converted to velocities using a
-    scale factor "precision" and offset "width/2" and passed into coll_vel_pdf.
-    Returns probability density at the velocity corresponding to these indices.
-    '''
-    return coll_vel_pdf(p*(x-w/2), p*(y-w/2), p*(z-w/2))
-
-def getAmbientVelocity(precision=4, width=700, simple=True):
-    '''
-    Returns the total ambient particle velocity from species rest frame.
-    Each thermal velocity component can range from -width/2 to width/2 (m/s).
-    Allowed thermal velocity components are spaced by "precision" (m/s).
-    SIMPLE case: for testing, uses vel_pdf instead of coll_vel_pdf.
-    '''
-    if simple == True:
-        v0 = vel_cv.rvs()
-        theta = theta_cv.rvs()
-        phi = np.random.uniform(0, 2*np.pi)
-        Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                           *np.sin(phi), v0*np.cos(theta))
-        return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
-
-    width = int(width/precision) # scale for mesh
-    probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
-                            p=precision, w=width).flatten()
-    inds = np.linspace(0, len(probs)-1, len(probs))
-    choice = np.random.choice(inds, p=probs/np.sum(probs))
-    ind3D = np.where(np.reshape(inds, (width, width, width)) == choice)
-    z_ind, y_ind, x_ind = int(ind3D[0]), int(ind3D[1]), int(ind3D[2])
-    z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
-    return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
-
-def initial_species_velocity(T_s0):
-    '''
-    Given species temperature, return randomized (Boltzmann) speed in a
-    randomized (spherically uniform) direction.
-    '''
-    global T_s
-    T_s_holder = T_s
-    T_s = T_s0
-    set_derived_quants()
-    v0 = species_vel_cv.rvs()
-    T_s = T_s_holder # Return to thermalized value
-    set_derived_quants()
-    theta = theta_cv.rvs()
-    phi = np.random.uniform(0, 2*np.pi)
-    Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
-                       *np.sin(phi), v0*np.cos(theta))
-    return Vx, Vy, Vz
-
-def initial_species_position(L=0.01, form=''):
-    '''
-    Return a random position in a cube of side length L around the origin.
-    '''
-    if form != 'currentCell':
-        x = np.random.uniform(-L/2, L/2)
-        y = np.random.uniform(-L/2, L/2)
-        z = np.random.uniform(-L/2, L/2)
-    else:
-        r = np.random.uniform(0, 0.002)
-        ang = np.random.uniform(0, 2*np.pi)
-        x, y = r * np.cos(ang), r * np.sin(ang)
-        z = np.random.uniform(0.035, 0.045)
-    return x, y, z
-
-def numClose(x, y, z, xs, ys, zs, dist=0.008):
-    '''
-    Gives the number of particles in xs,ys,zs within a cube of length 'dist'
-    around a particle at x, y, z.
-    '''
-    num_close = -1 # Will always see ≥ 1 close particle (itself)
-    for i in range(len(xs)):
-        if abs(x-xs[i]) < dist and abs(y-ys[i]) < dist and abs(z-zs[i]) < dist:
-            num_close += 1
-    return num_close
-
-def collide():
-    '''
-    For current values of position (giving ambient flow rate) and velocity,
-    increment vx, vy, vz according to collision physics.
-    '''
-    global vx, vy, vz
-    Theta = Theta_cv.rvs()
-    Phi = np.random.uniform(0, 2*np.pi)
-    vx_amb, vy_amb, vz_amb = getAmbientVelocity(simple=True)
-    v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
-    B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
-
-    vx += (v_amb * massParam * np.cos(Theta) * \
-           (np.sin(Theta) * np.cos(Phi) * B * (vx_amb-v_amb**2/vx_amb)\
-            + vx_amb * np.cos(Theta)/v_amb))
-
-    vy += (v_amb * massParam * np.cos(Theta) * \
-           (np.sin(Theta)*np.cos(Phi)*B*vy_amb + np.sin(Theta)*np.sin(Phi)*\
-            (vz_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb)-vx_amb*B*vz_amb/v_amb)\
-            + np.cos(Theta)*vy_amb/v_amb))
-
-    vz += (v_amb * massParam * np.cos(Theta) * \
-           (np.sin(Theta)*np.cos(Phi)*B*vz_amb + np.sin(Theta)*np.sin(Phi)*\
-            (vx_amb*B*vy_amb/v_amb-vy_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb))\
-            + np.cos(Theta)*vz_amb/v_amb))
-
-
-# =============================================================================
-# Simulation & Data Retrieval
-# =============================================================================
-
-def pathTrace(T_s0=4, form='box'):
-    '''
-    Track and return a list of sequential positions over time on a given path.
-    '''
-    global vx, vy, vz, t # Global velocities used for collide() and updating PDFs
-    x, y, z = initial_species_position(.01, form)
-    vx, vy, vz = initial_species_velocity(T_s0)
-    t = 0
-    xs = [x]
-    ys = [y]
-    zs = [z]
-
-    while inBounds(x, y, z, form):
-        # Typically takes 5-20 ms to leave box
-        updateParams(x, y, z, form)
-        if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
-            collide()
-        t += dt
-        x += vx * dt
-        y += vy * dt
-        z += vz * dt
-        xs.append(x)
-        ys.append(y)
-        zs.append(z)
-
-    print("Time to wall: "+str(t)+" seconds")
-    return xs, ys, zs
-
-def getDensityTrend(filename):
-    '''
-    Record mean time to hit wall for a range of ambient densities.
-    '''
-    global n
-    with open(filename, 'w') as f:
-        f.write("n (per cu. m)   mean iterations   mean time to stick   sig iter   sig time\n")
-        for density in [10**9, 10**9*5, 10**10, 10**10*5, 10**11, 10**11*5, 10**12]:
-            n = density
-            lens = []
-            times = []
-            for j in range(1000):
-                xs, ys, zs = pathTrace()
-                lens.append(len(xs))
-                times.append(t)
-            meanLen = str(np.mean(lens))
-            meanTime = str(np.mean(times))
-            stdLen = str(np.std(lens)/(len(lens)**0.5))
-            stdTime = str(np.std(times)/(len(times)**0.5))
-            f.write('%.1E'%n+' '+meanLen+' '+meanTime+' '+stdLen+' '+stdTime+'\n')
-    f.close()
-
-def getCrossTrend():
-    global cross
-    for i in [0.5, 1]:
-        cross = cross * i
-        set_derived_quants()
-        ts = []
-        for j in range(50):
-            x, y, z, t = 0, 0, 0, 0
-            vx, vy, vz = initial_species_velocity(T_s0=4)
-
-            while inBounds(x, y, z):
-                if np.random.uniform() < 0.1 and no_collide==False:
-                    collide()
-                x += vx * dt
-                y += vy * dt
-                z += vz * dt
-                t += dt
-            ts.append(t)
-
-        print(i, np.mean(ts), np.std(ts)/np.sqrt(50))
-
-def getData(t1=0.00005, t2=0.0015, step=0.00005, trials=400, x0=0, y0=0, z0=0, T_s0=4):
-    '''
-    For a range of total times, record expected values of final position,
-    square-distance, and speed near end of path.
-    '''
-    global vx, vy, vz
-    updateParams(x0, y0, z0, 'open')
-    with open('_'.join(map(str,[int(1e6*t1), int(1e6*t2), int(T_s0), int(xFlow), \
-                                int(M/m), int(np.log10(float(n)))]))+'.dat', 'w') as f:
-        f.write('   '.join(['time (s)','xAvg (m)','yAvg (m)', 'zAvg (m)', 'SqrAvg (sq. m)',\
-                          'SpeedAvg (m/s)','sigX','sigY', 'sigZ', 'sigSqr','sigSpeed'])+'\n')
-        for time in np.arange(t1, t2, step):
-            print(time)
-            xs = []
-            ys = []
-            zs = []
-            squares = []
-            speedAvgs = []
-            for j in range(trials):
-                print(j)
-                t = 0
-                x, y, z = x0, y0, z0
-                vx, vy, vz = initial_species_velocity(T_s0)
-                speeds = []
-                while t < time:
-                    updateParams(x, y, z, 'open')
-                    if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
-                        collide()
-                    t += dt
-                    x += vx * dt
-                    y += vy * dt
-                    z += vz * dt
-                    if t > 0.8 * time:
-                        speeds.append((vx**2 + vy**2 + vz**2)**0.5)
-                speedAvgs.append(np.mean(speeds))
-                squares.append(x**2+y**2+z**2)
-                xs.append(x)
-                ys.append(y)
-                zs.append(z)
-            meanx = str(np.mean(xs))
-            meany = str(np.mean(ys))
-            meanz = str(np.mean(zs))
-            meanSq = str(np.mean(squares))
-            meanSpeed = str(np.mean(speedAvgs))
-            stdx = str(np.std(xs)/(len(xs)**0.5))
-            stdy = str(np.std(ys)/(len(ys)**0.5))
-            stdz = str(np.std(zs)/(len(zs)**0.5))
-            stdSq = str(np.std(squares)/(len(squares)**0.5))
-            stdSpeed = str(np.std(speedAvgs)/(len(speedAvgs)**0.5))
-            f.write(' '.join([str(time),meanx,meany,meanz,meanSq,meanSpeed,\
-                              stdx,stdy,stdz,stdSq,stdSpeed])+'\n')
-    f.close()
-
-def endPosition(extPos=0.12):
-    '''
-    Return the final position of a particle somewhere in the cell or else
-    past the aperture within a distance extPos.
-    '''
-    global vx, vy, vz
-    trajectory = open('trajectory.dat', 'w')
-    np.random.seed()
-    x, y, z = initial_species_position(.01, 'currentCell')
-    vx, vy, vz = initial_species_velocity(T_s0=4)
-    inCell = True
-    xAp, yAp, zAp, vzAp, vrAp = 0, 0, 0, 0, 0
-    trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
-                                        round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
-    while inBounds(x, y, z, 'currentCell', extPos):
-        # Typically takes few ms to leave box
-        updateParams(x, y, z, 'currentCell')
-        if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
-            collide()
-            trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
-                                        round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
-        x += vx * dt
-        y += vy * dt
-        z += vz * dt
-        if z > 0.064 and inCell == True:
-            # Record properties at aperture
-            zAp = 0.064
-            xAp = x - (z-0.064)/(vz * dt) * (vx * dt)
-            yAp = y - (z-0.064)/(vz * dt) * (vy * dt)
-            vzAp, vrAp = vz, np.sqrt(vx**2+vy**2)
-            inCell = False
-
-    if z > extPos:
-        # Linearly backtrack to boundary
-        z = extPos
-        x -= (z-extPos)/(vz * dt) * (vx * dt)
-        y -= (z-extPos)/(vz * dt) * (vy * dt)
-    return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
-
-# =============================================================================
-# Image-generating functions
-# =============================================================================
-
-def showPaths(filename, form='currentCell'):
-    '''
-    Generate a scatter plot of 1000 equally t-spaced points from each of
-    three independent paths generated by pathTrace().
-    '''
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    for j in range(1):
-        xs, ys, zs = pathTrace(form=form)
-        for i in range(0, len(xs)):
-            if j == 1 :
-                colour = plt.cm.Greens(int(264. * i / len(xs)))
-            elif j == 2:
-                colour = plt.cm.Blues(int(264. * i / len(xs)))
-            else:
-                colour = plt.cm.Reds(int(264. * i / len(xs)))
-            ax.scatter(xs[i], ys[i], zs[i], s=.5, c=colour)
-
-    ax.set_xlim(-.01, .01)
-    ax.set_ylim(-.01, .01)
-    ax.set_zlim(0, .05)
-    plt.title("Paths of a Heavy Particle, n = %.0E" %n)
-    ax.set_xlabel('x, meters')
-    ax.set_ylabel('y, meters')
-    ax.set_zlabel('z, meters')
-    plt.savefig(filename)
-    plt.show()
-
-def showWalls(filename, form='currentCell', write_vels=False):
-    '''
-    Generate a scatter plot of final positions of molecules as determined by
-    the endPosition function parameters.
-    '''
-    if write_vels == True:
-        fv = open('apertureVels%s.dat'%filename[:-13], 'w')
-        fv.write("Radial Velocity   Axial Velocity\n")
-    with open("finalPositions%s.dat"%filename[:-13], "w") as f:
-        for j in range(1):
-            print(j)
-            x, y, z = endPosition(form=form)
-            f.write("%.5f %.5f %.5f \n"%(x, y, z))
-            if write_vels == True and z == 0.064 and np.sqrt(x**2+y**2) < 0.00075:
-                fv.write("%.5f %.5f \n"%((vx**2+vy**2)**0.5, vz))
-            colour = plt.cm.Greens(int(64 + 200 * abs(y) / 0.05)) # color = y coord
-            if form not in ['currentCell']:
-                plt.plot (x, z, c=colour, marker='+', ms=13)
-            else:
-                plt.plot(z, np.sqrt(x**2+y**2), c=colour, marker='+', ms=13)
-    f.close()
-    if form == 'currentCell':
-        plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
-        plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
-        plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
-        plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
-        plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
-        plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
-        plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
-        plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
-        plt.xlim(0, 0.07)
-        plt.ylim(0, 0.01)
-    else:
-        plt.hlines(0.05, -.05, .05, colors='gray', linewidths=.5)
-        plt.hlines(-0.05, -.05, .05, colors='gray', linewidths=.5)
-        plt.vlines(0.05, -.05, .05, colors='gray', linewidths=.5)
-        plt.vlines(-0.05, -.05, .05, colors='gray', linewidths=.5)
-        plt.xlim(-.055, .055)
-        plt.ylim(-.055, .055)
-    plt.title("Final Positions of a Heavy Particle")
-    plt.xlabel('z, meters')
-    plt.ylabel('r, meters')
-    plt.savefig(filename)
-    plt.show()
-
-def pointEmitter(filename="ConstantFlowEmitter.dat", x0=0, y0=0, z0=0, T_s0=4, form='box'):
-    '''
-    Assuming constant-rate emission of species molecules of random velocities
-    (determined by a T = T_s0 thermal distribution) from (x0, y0, z0), record
-    the positions of all emitted particles after some time, assign each
-    particle a density, and plot them with density-scaling color values.
-    '''
-    global vx, vy, vz
-    xs, ys, zs = [], [], []
-    for time in np.arange(0.01, 6, 0.01): # ms
-        print(time)
-        x, y, z = x0, y0, z0
-        vx, vy, vz = initial_species_velocity(T_s0)
-        t = 0
-        while t < time * 1e-3:
-            updateParams(x, y, z, form)
-            if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
-                collide()
-            t += dt
-            x += vx * dt
-            y += vy * dt
-            z += vz * dt
-        xs.append(x)
-        ys.append(y)
-        zs.append(z)
-
-    densities = []
-    for i in range(len(xs)):
-        densities.append(numClose(xs[i], ys[i], zs[i], xs, ys, zs))
-
-    trace = go.Scatter3d(x=xs, y=ys, z=zs, mode='markers', \
-        marker=dict(size=12,color=densities,colorscale='Rainbow',opacity=0.8))
-    fig = go.Figure(data=[trace], layout=go.Layout())
-    plo.offline.plot(fig, filename='simple-3d-scatter')
-
-    with open(filename, 'w') as f:
-        for i in range(len(xs)):
-            f.write(str(xs[i])+' '+str(ys[i])+' '+str(zs[i])+'\n')
-    f.close()
+# try:
+#     raise # Skip data loading when only want file analysis function
+#     flowField = np.loadtxt('flows/DS2FF019.DAT', skiprows=1) # Assumes only first row isn't data.
+#     zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7]
+#     vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6]
+#     quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
+#     grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+#     # The high grid density increases overhead time for running this initialization,
+#     # but the time for running particle simulations is unaffected.
+#     grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
+#     grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
+#     grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
+#     grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
+#     grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
+#     # The 'nearest' gridding has not been thoroughly tested for edge-case accuracy.
+#     # These are interpolation functions:
+#     f1 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
+#     f2 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
+#     f3 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
+#     f4 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
+#     f5 = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
+# except:
+#     print("Note: No Flow Field DSMC data.")
+#
+# def dsmcQuant(x0, y0, z0, func):
+#     quant0 = func(z0, (x0**2 + y0**2)**0.5)[0][0]
+#     if func == f3:
+#         Vz = quant0
+#         vr = dsmcQuant(x0, y0, z0, f4)
+#         vPerpCw = dsmcQuant(x0, y0, z0, f5)
+#
+#         theta = np.arctan2(y0, x0)
+#         rot = np.pi/2 - theta
+#         Vx = np.cos(rot) * vPerpCw + np.sin(rot) * vr
+#         Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
+#         return Vx, Vy, Vz
+#     if func == f1:
+#         return np.exp(quant0)
+#     return quant0
+#
+# def inBounds(x, y, z, form='box', endPos=0.12):
+#     '''
+#     Return Boolean value for whether or not a position is within
+#     the boundary of "form".
+#     '''
+#     if form in ['box', 'curvedFlowBox']:
+#         inside = abs(x) <= 0.005 and abs(y) <= 0.005 and abs(z) <= 0.005
+#     elif form == 'currentCell':
+#         r = np.sqrt(x**2+y**2)
+#         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
+#         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
+#         in3 = r < 0.030 and z >= 0.0640 and z < endPos
+#         inside = in1 + in2 + in3
+#     return inside
+#
+# def setAmbientFlow(x, y, z, form='box'):
+#     '''
+#     Given position of species molecule, set ambient flow velocities to known
+#     (DSMC-generated) local values.
+#     '''
+#     global xFlow, yFlow, zFlow
+#     if form in ['box', 'open']:
+#         xFlow, yFlow, zFlow = 0, 0, 0
+#     elif form == 'curvedFlowBox':
+#         r = (x**2+y**2)**0.5
+#         radFlow = -5*z*np.exp(-0.4*abs(5*z+1)) * 100 * r
+#         xFlow = x * radFlow / r * 100
+#         yFlow = y * radFlow / r * 100
+#         zFlow = 0.2 * 100
+#     elif form == 'currentCell':
+#         xFlow, yFlow, zFlow = dsmcQuant(x, y, z, f3)
+#         if abs(xFlow) > 1000:
+#             print(x, y, z, xFlow, 'm/s')
+#
+# def setAmbientDensity(x, y, z, form='box'):
+#     '''
+#     Given position of species molecule, set ambient density to known
+#     (DSMC-generated) local value.
+#     '''
+#     global n
+#     if form in ['box', 'curvedFlowBox', 'open']:
+#         n = n
+#     elif form == 'currentCell':
+#         n = dsmcQuant(x, y, z, f1)
+#         if abs(n) > 1e26:
+#             print(x, y, z, n, 'm-3')
+#
+# def setAmbientTemp(x, y, z, form='box'):
+#     '''
+#     Given position of species molecule, set ambient temperature to known
+#     (DSMC-generated) local value.
+#     '''
+#     global T
+#     if form in ['box', 'curvedFlowBox', 'open']:
+#         T = T
+#     elif form == 'currentCell':
+#         T = dsmcQuant(x, y, z, f2)
+#         if abs(T) > 500:
+#             print(x, y, z, T, 'K')
+#
+# def updateParams(x, y, z, form='box'):
+#     setAmbientFlow(x, y, z, form)
+#     setAmbientDensity(x, y, z, form)
+#     setAmbientTemp(x, y, z, form)
+#     set_derived_quants()
+#
+# # =============================================================================
+# # Helper Functions
+# # =============================================================================
+#
+# def coll_vel_index_pdf(x, y, z, p, w):
+#     '''
+#     Here, indices x, y, z are linearly converted to velocities using a
+#     scale factor "precision" and offset "width/2" and passed into coll_vel_pdf.
+#     Returns probability density at the velocity corresponding to these indices.
+#     '''
+#     return coll_vel_pdf(p*(x-w/2), p*(y-w/2), p*(z-w/2))
+#
+# def getAmbientVelocity(precision=4, width=700, simple=True):
+#     '''
+#     Returns the total ambient particle velocity from species rest frame.
+#     Each thermal velocity component can range from -width/2 to width/2 (m/s).
+#     Allowed thermal velocity components are spaced by "precision" (m/s).
+#     SIMPLE case: for testing, uses vel_pdf instead of coll_vel_pdf.
+#     '''
+#     if simple == True:
+#         v0 = vel_cv.rvs()
+#         theta = theta_cv.rvs()
+#         phi = np.random.uniform(0, 2*np.pi)
+#         Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+#                            *np.sin(phi), v0*np.cos(theta))
+#         return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
+#
+#     width = int(width/precision) # scale for mesh
+#     probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
+#                             p=precision, w=width).flatten()
+#     inds = np.linspace(0, len(probs)-1, len(probs))
+#     choice = np.random.choice(inds, p=probs/np.sum(probs))
+#     ind3D = np.where(np.reshape(inds, (width, width, width)) == choice)
+#     z_ind, y_ind, x_ind = int(ind3D[0]), int(ind3D[1]), int(ind3D[2])
+#     z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
+#     return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
+#
+# def initial_species_velocity(T_s0):
+#     '''
+#     Given species temperature, return randomized (Boltzmann) speed in a
+#     randomized (spherically uniform) direction.
+#     '''
+#     global T_s
+#     T_s_holder = T_s
+#     T_s = T_s0
+#     set_derived_quants()
+#     v0 = species_vel_cv.rvs()
+#     T_s = T_s_holder # Return to thermalized value
+#     set_derived_quants()
+#     theta = theta_cv.rvs()
+#     phi = np.random.uniform(0, 2*np.pi)
+#     Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+#                        *np.sin(phi), v0*np.cos(theta))
+#     return Vx, Vy, Vz
+#
+# def initial_species_position(L=0.01, form=''):
+#     '''
+#     Return a random position in a cube of side length L around the origin.
+#     '''
+#     if form != 'currentCell':
+#         x = np.random.uniform(-L/2, L/2)
+#         y = np.random.uniform(-L/2, L/2)
+#         z = np.random.uniform(-L/2, L/2)
+#     else:
+#         r = np.random.uniform(0, 0.002)
+#         ang = np.random.uniform(0, 2*np.pi)
+#         x, y = r * np.cos(ang), r * np.sin(ang)
+#         z = np.random.uniform(0.035, 0.045)
+#     return x, y, z
+#
+# def numClose(x, y, z, xs, ys, zs, dist=0.008):
+#     '''
+#     Gives the number of particles in xs,ys,zs within a cube of length 'dist'
+#     around a particle at x, y, z.
+#     '''
+#     num_close = -1 # Will always see ≥ 1 close particle (itself)
+#     for i in range(len(xs)):
+#         if abs(x-xs[i]) < dist and abs(y-ys[i]) < dist and abs(z-zs[i]) < dist:
+#             num_close += 1
+#     return num_close
+#
+# def collide():
+#     '''
+#     For current values of position (giving ambient flow rate) and velocity,
+#     increment vx, vy, vz according to collision physics.
+#     '''
+#     global vx, vy, vz
+#     Theta = Theta_cv.rvs()
+#     Phi = np.random.uniform(0, 2*np.pi)
+#     vx_amb, vy_amb, vz_amb = getAmbientVelocity(simple=True)
+#     v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
+#     B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
+#
+#     vx += (v_amb * massParam * np.cos(Theta) * \
+#            (np.sin(Theta) * np.cos(Phi) * B * (vx_amb-v_amb**2/vx_amb)\
+#             + vx_amb * np.cos(Theta)/v_amb))
+#
+#     vy += (v_amb * massParam * np.cos(Theta) * \
+#            (np.sin(Theta)*np.cos(Phi)*B*vy_amb + np.sin(Theta)*np.sin(Phi)*\
+#             (vz_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb)-vx_amb*B*vz_amb/v_amb)\
+#             + np.cos(Theta)*vy_amb/v_amb))
+#
+#     vz += (v_amb * massParam * np.cos(Theta) * \
+#            (np.sin(Theta)*np.cos(Phi)*B*vz_amb + np.sin(Theta)*np.sin(Phi)*\
+#             (vx_amb*B*vy_amb/v_amb-vy_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb))\
+#             + np.cos(Theta)*vz_amb/v_amb))
+#
+#
+# # =============================================================================
+# # Simulation & Data Retrieval
+# # =============================================================================
+#
+# def pathTrace(T_s0=4, form='box'):
+#     '''
+#     Track and return a list of sequential positions over time on a given path.
+#     '''
+#     global vx, vy, vz, t # Global velocities used for collide() and updating PDFs
+#     x, y, z = initial_species_position(.01, form)
+#     vx, vy, vz = initial_species_velocity(T_s0)
+#     t = 0
+#     xs = [x]
+#     ys = [y]
+#     zs = [z]
+#
+#     while inBounds(x, y, z, form):
+#         # Typically takes 5-20 ms to leave box
+#         updateParams(x, y, z, form)
+#         if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
+#             collide()
+#         t += dt
+#         x += vx * dt
+#         y += vy * dt
+#         z += vz * dt
+#         xs.append(x)
+#         ys.append(y)
+#         zs.append(z)
+#
+#     print("Time to wall: "+str(t)+" seconds")
+#     return xs, ys, zs
+#
+# def getDensityTrend(filename):
+#     '''
+#     Record mean time to hit wall for a range of ambient densities.
+#     '''
+#     global n
+#     with open(filename, 'w') as f:
+#         f.write("n (per cu. m)   mean iterations   mean time to stick   sig iter   sig time\n")
+#         for density in [10**9, 10**9*5, 10**10, 10**10*5, 10**11, 10**11*5, 10**12]:
+#             n = density
+#             lens = []
+#             times = []
+#             for j in range(1000):
+#                 xs, ys, zs = pathTrace()
+#                 lens.append(len(xs))
+#                 times.append(t)
+#             meanLen = str(np.mean(lens))
+#             meanTime = str(np.mean(times))
+#             stdLen = str(np.std(lens)/(len(lens)**0.5))
+#             stdTime = str(np.std(times)/(len(times)**0.5))
+#             f.write('%.1E'%n+' '+meanLen+' '+meanTime+' '+stdLen+' '+stdTime+'\n')
+#     f.close()
+#
+# def getCrossTrend():
+#     global cross
+#     for i in [0.5, 1]:
+#         cross = cross * i
+#         set_derived_quants()
+#         ts = []
+#         for j in range(50):
+#             x, y, z, t = 0, 0, 0, 0
+#             vx, vy, vz = initial_species_velocity(T_s0=4)
+#
+#             while inBounds(x, y, z):
+#                 if np.random.uniform() < 0.1 and no_collide==False:
+#                     collide()
+#                 x += vx * dt
+#                 y += vy * dt
+#                 z += vz * dt
+#                 t += dt
+#             ts.append(t)
+#
+#         print(i, np.mean(ts), np.std(ts)/np.sqrt(50))
+#
+# def getData(t1=0.00005, t2=0.0015, step=0.00005, trials=400, x0=0, y0=0, z0=0, T_s0=4):
+#     '''
+#     For a range of total times, record expected values of final position,
+#     square-distance, and speed near end of path.
+#     '''
+#     global vx, vy, vz
+#     updateParams(x0, y0, z0, 'open')
+#     with open('_'.join(map(str,[int(1e6*t1), int(1e6*t2), int(T_s0), int(xFlow), \
+#                                 int(M/m), int(np.log10(float(n)))]))+'.dat', 'w') as f:
+#         f.write('   '.join(['time (s)','xAvg (m)','yAvg (m)', 'zAvg (m)', 'SqrAvg (sq. m)',\
+#                           'SpeedAvg (m/s)','sigX','sigY', 'sigZ', 'sigSqr','sigSpeed'])+'\n')
+#         for time in np.arange(t1, t2, step):
+#             print(time)
+#             xs = []
+#             ys = []
+#             zs = []
+#             squares = []
+#             speedAvgs = []
+#             for j in range(trials):
+#                 print(j)
+#                 t = 0
+#                 x, y, z = x0, y0, z0
+#                 vx, vy, vz = initial_species_velocity(T_s0)
+#                 speeds = []
+#                 while t < time:
+#                     updateParams(x, y, z, 'open')
+#                     if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
+#                         collide()
+#                     t += dt
+#                     x += vx * dt
+#                     y += vy * dt
+#                     z += vz * dt
+#                     if t > 0.8 * time:
+#                         speeds.append((vx**2 + vy**2 + vz**2)**0.5)
+#                 speedAvgs.append(np.mean(speeds))
+#                 squares.append(x**2+y**2+z**2)
+#                 xs.append(x)
+#                 ys.append(y)
+#                 zs.append(z)
+#             meanx = str(np.mean(xs))
+#             meany = str(np.mean(ys))
+#             meanz = str(np.mean(zs))
+#             meanSq = str(np.mean(squares))
+#             meanSpeed = str(np.mean(speedAvgs))
+#             stdx = str(np.std(xs)/(len(xs)**0.5))
+#             stdy = str(np.std(ys)/(len(ys)**0.5))
+#             stdz = str(np.std(zs)/(len(zs)**0.5))
+#             stdSq = str(np.std(squares)/(len(squares)**0.5))
+#             stdSpeed = str(np.std(speedAvgs)/(len(speedAvgs)**0.5))
+#             f.write(' '.join([str(time),meanx,meany,meanz,meanSq,meanSpeed,\
+#                               stdx,stdy,stdz,stdSq,stdSpeed])+'\n')
+#     f.close()
+#
+# def endPosition(extPos=0.12):
+#     '''
+#     Return the final position of a particle somewhere in the cell or else
+#     past the aperture within a distance extPos.
+#     '''
+#     global vx, vy, vz
+#     trajectory = open('trajectory.dat', 'w')
+#     np.random.seed()
+#     x, y, z = initial_species_position(.01, 'currentCell')
+#     vx, vy, vz = initial_species_velocity(T_s0=4)
+#     inCell = True
+#     xAp, yAp, zAp, vzAp, vrAp = 0, 0, 0, 0, 0
+#     trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
+#                                         round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
+#     while inBounds(x, y, z, 'currentCell', extPos):
+#         # Typically takes few ms to leave box
+#         updateParams(x, y, z, 'currentCell')
+#         if np.random.uniform() < 0.1 and no_collide==False: # 1/10 chance of collision
+#             collide()
+#             trajectory.write(' '.join(map(str, [round(x,7), round(y,7), round(z,7), \
+#                                         round(np.sqrt(vx**2+vy**2),1), round(vz,1)]))+'\n')
+#         x += vx * dt
+#         y += vy * dt
+#         z += vz * dt
+#         if z > 0.064 and inCell == True:
+#             # Record properties at aperture
+#             zAp = 0.064
+#             xAp = x - (z-0.064)/(vz * dt) * (vx * dt)
+#             yAp = y - (z-0.064)/(vz * dt) * (vy * dt)
+#             vzAp, vrAp = vz, np.sqrt(vx**2+vy**2)
+#             inCell = False
+#
+#     if z > extPos:
+#         # Linearly backtrack to boundary
+#         z = extPos
+#         x -= (z-extPos)/(vz * dt) * (vx * dt)
+#         y -= (z-extPos)/(vz * dt) * (vy * dt)
+#     return xAp, yAp, zAp, vrAp, vzAp, x, y, z, np.sqrt(vx**2+vy**2), vz
+#
+# # =============================================================================
+# # Image-generating functions
+# # =============================================================================
+#
+# def showPaths(filename, form='currentCell'):
+#     '''
+#     Generate a scatter plot of 1000 equally t-spaced points from each of
+#     three independent paths generated by pathTrace().
+#     '''
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection='3d')
+#
+#     for j in range(1):
+#         xs, ys, zs = pathTrace(form=form)
+#         for i in range(0, len(xs)):
+#             if j == 1 :
+#                 colour = plt.cm.Greens(int(264. * i / len(xs)))
+#             elif j == 2:
+#                 colour = plt.cm.Blues(int(264. * i / len(xs)))
+#             else:
+#                 colour = plt.cm.Reds(int(264. * i / len(xs)))
+#             ax.scatter(xs[i], ys[i], zs[i], s=.5, c=colour)
+#
+#     ax.set_xlim(-.01, .01)
+#     ax.set_ylim(-.01, .01)
+#     ax.set_zlim(0, .05)
+#     plt.title("Paths of a Heavy Particle, n = %.0E" %n)
+#     ax.set_xlabel('x, meters')
+#     ax.set_ylabel('y, meters')
+#     ax.set_zlabel('z, meters')
+#     plt.savefig(filename)
+#     plt.show()
+#
+# def showWalls(filename, form='currentCell', write_vels=False):
+#     '''
+#     Generate a scatter plot of final positions of molecules as determined by
+#     the endPosition function parameters.
+#     '''
+#     if write_vels == True:
+#         fv = open('apertureVels%s.dat'%filename[:-13], 'w')
+#         fv.write("Radial Velocity   Axial Velocity\n")
+#     with open("finalPositions%s.dat"%filename[:-13], "w") as f:
+#         for j in range(1):
+#             print(j)
+#             x, y, z = endPosition(form=form)
+#             f.write("%.5f %.5f %.5f \n"%(x, y, z))
+#             if write_vels == True and z == 0.064 and np.sqrt(x**2+y**2) < 0.00075:
+#                 fv.write("%.5f %.5f \n"%((vx**2+vy**2)**0.5, vz))
+#             colour = plt.cm.Greens(int(64 + 200 * abs(y) / 0.05)) # color = y coord
+#             if form not in ['currentCell']:
+#                 plt.plot (x, z, c=colour, marker='+', ms=13)
+#             else:
+#                 plt.plot(z, np.sqrt(x**2+y**2), c=colour, marker='+', ms=13)
+#     f.close()
+#     if form == 'currentCell':
+#         plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
+#         plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
+#         plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
+#         plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
+#         plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
+#         plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
+#         plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
+#         plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+#         plt.xlim(0, 0.07)
+#         plt.ylim(0, 0.01)
+#     else:
+#         plt.hlines(0.05, -.05, .05, colors='gray', linewidths=.5)
+#         plt.hlines(-0.05, -.05, .05, colors='gray', linewidths=.5)
+#         plt.vlines(0.05, -.05, .05, colors='gray', linewidths=.5)
+#         plt.vlines(-0.05, -.05, .05, colors='gray', linewidths=.5)
+#         plt.xlim(-.055, .055)
+#         plt.ylim(-.055, .055)
+#     plt.title("Final Positions of a Heavy Particle")
+#     plt.xlabel('z, meters')
+#     plt.ylabel('r, meters')
+#     plt.savefig(filename)
+#     plt.show()
+#
+# def pointEmitter(filename="ConstantFlowEmitter.dat", x0=0, y0=0, z0=0, T_s0=4, form='box'):
+#     '''
+#     Assuming constant-rate emission of species molecules of random velocities
+#     (determined by a T = T_s0 thermal distribution) from (x0, y0, z0), record
+#     the positions of all emitted particles after some time, assign each
+#     particle a density, and plot them with density-scaling color values.
+#     '''
+#     global vx, vy, vz
+#     xs, ys, zs = [], [], []
+#     for time in np.arange(0.01, 6, 0.01): # ms
+#         print(time)
+#         x, y, z = x0, y0, z0
+#         vx, vy, vz = initial_species_velocity(T_s0)
+#         t = 0
+#         while t < time * 1e-3:
+#             updateParams(x, y, z, form)
+#             if np.random.uniform() < 0.01 and no_collide == False: # 1/100 chance of collision
+#                 collide()
+#             t += dt
+#             x += vx * dt
+#             y += vy * dt
+#             z += vz * dt
+#         xs.append(x)
+#         ys.append(y)
+#         zs.append(z)
+#
+#     densities = []
+#     for i in range(len(xs)):
+#         densities.append(numClose(xs[i], ys[i], zs[i], xs, ys, zs))
+#
+#     trace = go.Scatter3d(x=xs, y=ys, z=zs, mode='markers', \
+#         marker=dict(size=12,color=densities,colorscale='Rainbow',opacity=0.8))
+#     fig = go.Figure(data=[trace], layout=go.Layout())
+#     plo.offline.plot(fig, filename='simple-3d-scatter')
+#
+#     with open(filename, 'w') as f:
+#         for i in range(len(xs)):
+#             f.write(str(xs[i])+' '+str(ys[i])+' '+str(zs[i])+'\n')
+#     f.close()
 
 # =============================================================================
 # Data file analysis
@@ -781,6 +781,9 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     Plots position/velocity distributions at selected analysis surface.
     The default xy-plane is set to the aperture position, z=0.064 m.
     The default dome is set to radius r=0.02 m.
+
+    The argument file_ext is expected to be in the xyyy.DAT format, where x gives the geometry and
+    yyy gives the flowrate in SCCM; e.g. f002.DAT is geometry "f" with 2 SCCM flow.
     '''
     print('The aperture is at z = 0.064 m.')
 
@@ -831,7 +834,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
 
 
-    directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+#    directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
+    directory = '/Users/gabri/Desktop/HutzlerSims/New_DSMC/'
 
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
                   'InitLarge':'InitLarge/{}_init1.dat',\
@@ -847,7 +851,11 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                'ClusterRCell':'ClusterRCell/{}.dat',\
                   'TStep100' :'TStep100/{}.dat',\
                'ClusterQCell':'ClusterQCell/{}.dat',\
-             'CorrectedDist' :'CorrectedDist/{}.dat'\
+             'CorrectedDist' :'CorrectedDist/{}.dat',\
+             'GenCompare0' : 'GenCompare0/{}.dat',\
+             'GenCompare1' : 'GenCompare1/{}.dat',\
+             'GenCompare2' : 'GenCompare2/{}.dat',\
+             'GenCompare3' : 'GenCompare3/{}.dat'\
                 }
 
     #Nx6 array. Organized by x,y,z,vx,vy,vz
@@ -1220,7 +1228,7 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
     geom='r'
-    fileList = ['002', '005', '010', '020', '050']
+    fileList = ['002', '005', '010', '020', '050','200']
 
 #    folder = 'InitLarge'
 
@@ -1386,12 +1394,12 @@ def series_multirate_plots(plane=0.064):
                 'ClusterJCell/window94.dat' : (0, 'de Laval', 'o', '--'),\
                 'ClusterKCell/window94.dat' : (0, 'de Laval III (K)', 'o', '--'),\
 
-                   'InitLarge/window94.dat' : (0, 'Standard', 'o', '--'),\
-              
+                   'InitLarge/window94.dat' : (0, 'Single-stage Cell', 'o', '--'),\
+
               'InitLargeKCell/window94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
 
-                    'InitLarge/plane94.dat' : (0, 'Standard', 'o', '--'),\
-                    
+                    'InitLarge/plane94.dat' : (1, 'Single-stage Cell', 'o', '--'),\
+
                'InitLargeKCell/plane94.dat' : (0, 'de Laval K (i-1)', 'o', '--'),\
 
                    'InitLarge/plane111.dat' : (0, 'Straight (I1)', 'o', '--'),\
@@ -1404,19 +1412,21 @@ def series_multirate_plots(plane=0.064):
 
               'InitAblatFCell/aperture.dat' : (0, 'Ablation', 'o', '--'),\
                'TimeColumn/aperture_mr.dat' : (0, 'Small', 'o', '--'),\
-                'InitLarge/aperture_mr.dat' : (1, 'Normal', 'o', '--'),
+
+                'InitLarge/aperture_mr.dat' : (0, 'Normal', 'o', '--'),
+
               'InitAblatFCell/window94.dat' : (0, 'Ablation', 'o', '--'),\
                'InitAblatFCell/plane94.dat' : (0, 'Ablation', 'o', '--'),\
 
-               'ClusterPCell/plane1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
-              'ClusterPCell/window1026.dat' : (0, 'Partial Adsorber', 'o', '--'),\
+               'ClusterPCell/plane1026.dat' : (1, 'Slowing Cell P', 'o', '--'),\
+              'ClusterPCell/window1026.dat' : (0, 'Slowing Cell P', 'o', '--'),\
 
                     'TStep100/aperture.dat' : (0, '100step', 'o', '--'),\
                      'TStep100/plane94.dat' : (0, '100step', 'o', '--'),\
                     'TStep100/window94.dat' : (0, '100step', 'o', '--'),\
 
-                'ClusterNCell/plane103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
-               'ClusterNCell/window103.dat' : (0, 'Open Vent (fixed)', 'o', '--'),\
+                'ClusterNCell/plane103.dat' : (1, 'Slowing Cell N', 'o', '--'),\
+               'ClusterNCell/window103.dat' : (0, 'Slowing Cell N', 'o', '--'),\
 
                 'ClusterQCell/window94.dat' : (0, 'ExpQ', 'o', '--'),\
                  'ClusterQCell/plane94.dat' : (0, 'ExpQ', 'o', '--'),\
@@ -1424,8 +1434,8 @@ def series_multirate_plots(plane=0.064):
 
                 'ClusterRCell/window94.dat' : (0, 'ExpR', 'o', '--'),\
                  'ClusterRCell/plane94.dat' : (0, 'ExpR', 'o', '--'),\
-                'ClusterRCell/aperture.dat' : (1, 'ExpR', 'o', '--'),\
-                
+                'ClusterRCell/aperture.dat' : (0, 'ExpR', 'o', '--'),\
+
                'CorrectedDist/aperture.dat' : (0, 'Corrected', 'o',':'),\
                'CorrectedDist/window94.dat' : (0, 'Corrected', 'o',':'),\
                 'CorrectedDist/plane94.dat' : (0, 'Corrected', 'o',':')\
@@ -1475,7 +1485,7 @@ def series_multirate_plots(plane=0.064):
     plt.ylabel("Fraction Extracted")
     plt.yticks(np.arange(0,1.1,step=0.10))
     # plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-    howMany = 5
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(ext_dic[file])[0:howMany], yerr=(sigE_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
@@ -1487,7 +1497,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Forward Velocity [m/s]")
     # plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-    howMany = 5
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(vz_dic[file])[0:howMany], yerr=(vzSig_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()
@@ -1531,7 +1541,7 @@ def series_multirate_plots(plane=0.064):
     plt.xlabel("Flow [SCCM]")
     plt.ylabel("Median Beam Radius [mm]")
     # plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-    howMany = 6
+    howMany = 7
     for file in seriesList:
         plt.errorbar(x=(fr_dic[file])[0:howMany], y=(medRad_dic[file])[0:howMany], label=legends[file], fmt=formats[file],ls=linestyles[file])
     plt.legend()

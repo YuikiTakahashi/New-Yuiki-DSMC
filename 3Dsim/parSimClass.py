@@ -1,4 +1,4 @@
-corrected#!/usr/bin/python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
 Created August 2019
@@ -10,7 +10,7 @@ import scipy.stats as st
 import scipy.interpolate as si
 from joblib import Parallel, delayed
 #from multiprocessing import Pool
-from pathos.multiprocessing import ProcessingPool as Pool
+# from pathos.multiprocessing import ProcessingPool as Pool
 import itertools
 import argparse
 import sys
@@ -43,7 +43,7 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, crossMult=5, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=1):
+    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=1):
 
         #Set as 1 for basic vel_pdf (default prior to 08/2019)
         #Set as 2 for vel_corrected_pdf
@@ -71,50 +71,62 @@ class ParticleTracing(object):
         #Probability of collision, set at 1/10. Higher probability means finer time-step
         self._collProb = 0.1
 
-        self._FF = flowFieldName
-        self._PARTICLE_NUMBER = NPAR
-        self._CROSS_MULT = crossMult
-        self._LITE_MODE = LITE_MODE
-        self._INIT_COND = INIT_COND
-        self._PROBE_MODE = PROBE_MODE
-
-
-        # self._T = 4 # Ambient helium temperature (K)
-        # self._Ts = 4 # Molecular species temperature (K), used for initial velocity distributions
-        #
-        # self._n = 10**21 # number density, m^-3
-
-        cross = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
-        cross *= 4 # Rough estimate of He-YbOH cross section area
-        self._cross = cross * crossMult # Manual adjustment to vary collision frequency
-
-        vMean = 2 * (2 * KB * 4 / (M_HE * np.pi))**0.5 #Mean velocity for 4K helium gas
-
-        self._max_boltz_cv = MaxwellBoltzmann_pdf(a=0, b=4*vMean, name='vel_pdf')
-
-        #"Corrected" uses approximate Bayesian approach i.e. extra factor of v
-        self._vel_ambient_cv =  AmbientCorrected_pdf(a=0, b=4*vMean, name='vel_corrected_pdf')
-
-        self._theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
-        self._Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
-
         # =============================================================================
         # Load cell geometry and flow field
         # =============================================================================
+        self._FF = flowFieldName #Filename for DSMC output file
+        self.set_flow_type(flowFieldName)
 
+
+        self._PARTICLE_NUMBER = NPAR #Number of particles to simulate
+        self._CROSS_MULT = CROSS_MULT #Fine-tuning colllision cross section parameter
+
+        self._LITE_MODE = LITE_MODE #If True, does not record particle trajectory until close to the aperture.
+
+        self._INIT_COND = INIT_COND #Initial conditions "type" selected for the molecules
+        self._PROBE_MODE = PROBE_MODE #If True, records the molecules initial and final positions ONLY
+
+        # =============================================================================
+        # Use the CROSS_MULT parameter to tune the He-Species collision cross section.
+        # =============================================================================
+        cross_He = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
+        self._cross = 20 * CROSS_MULT * cross_He # Rough estimate of He-YbOH cross section area.
+
+        # vMean = 2 * (2 * KB * 4 / (M_HE * np.pi))**0.5 #Mean velocity for 4K helium gas
+        # self._theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
+        self._Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
+        # ***** End of class constructor ****** #
+
+    def set_flow_type(self, FF):
+        '''
+        Loads DSMC output file FF and uses bivariate spline method to set gas characteristics
+        on a grid of points.
+
+        Args:
+        FF is the filename of the DSMC output file (DS2FF.DAT) which should be named in the format
+        xyyy.dat, where x denotes the geometry and yyy denotes the gas flow-rate. e.g. f005.dat
+
+        The class instance will update the following attributes:
+        # self._geometry: cell geometry, denoted by a single letter ('f', 'g', 'h', etc)
+        # self._flowrate: buffer gas flowrate of the DSMC simulation, in SCCM.
+
+        # self._fDens, self._fTemp, self._fVz, self._fVr, self._fVp: the scipy.interpolate objects
+        corresponding to the density, temperature, etc. on the grid.
+
+        **IMPORTANT: this method needs to be updated with each new designed cell geometry, depending
+        on the desired size and coarseness of the simulation site.
+        '''
         try:
             #Geometry is a string in ['fCell', 'gCell', 'hCell', ..., 'pCell', 'rCell', ...]
             #Flowrate is an integer in [2, 5, ..., 200] (SCCM)
-            ###################
-            #CLEAN UP!
-            ###################
+
             geometry, flowrate = get_flow_chars(self._FF)
 
             self._geometry = geometry
             self._flowrate = flowrate
-            print("Loading flow field: geometry {0}, flowrate {1} SCCM".format(geometry,self._flowrate))
+            # print("Loading flow field: geometry {0}, flowrate {1} SCCM".format(geometry,self._flowrate))
 
-            flowField = np.loadtxt(self._FF, skiprows=1) # Assumes only first row isn't data.
+            flowField = np.loadtxt(self._FF, skiprows=1) # Assumes only first row is not data.
 
             zs, rs, dens, temps = flowField[:, 0], flowField[:, 1], flowField[:, 2], flowField[:, 7] #Arrays of z and r coordinates, density and temperature
             vzs, vrs, vps = flowField[:, 4], flowField[:, 5], flowField[:, 6] #velocity field in z, r, and "perpendicular" directions
@@ -147,12 +159,18 @@ class ParticleTracing(object):
 
         except:
             raise ValueError('Could not load flow field')
-        #End of class constructor __init__()
+
+
+    # def set_sim_params(flowFieldName=None, NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
+    #     loc = locals()
+    #     for arg in loc:
+    #         if loc != None
 
 
 ###############################################################################
 # MAIN PROGRAM METHODS
 ###############################################################################
+
     def get_trajectory(self, boundary):
         '''
         To be run in parallel in the self.main class method.
@@ -161,23 +179,51 @@ class ParticleTracing(object):
         return self.track_molecules(endPos=boundary, numTraj=1)
 
 
-    def main(self):
+    def main(self, outfile):
         '''
         Uses parallelization library to compute several molecule
-        trajectories.
+        trajectories and write the results to an output file.
         '''
-        print("CORRECTION = {}".format(self._CORRECTION))
 
-        particleNum = self._PARTICLE_NUMBER
-        cellGeometry = self._geometry
-        default_endPos = self._knownGeometries[cellGeometry][1]
+        #Boundary of the simulation site, i.e. when do we terminate the particle's path.
+        default_endPos = self._knownGeometries[self._geometry][1]
 
-        inputs = np.ones(particleNum) * default_endPos
+        inputs = np.ones(self._PARTICLE_NUMBER) * default_endPos
 
-        pool = Pool()
-        #Need to unpack results before returning?
-        tempResults = pool.amap(self.get_trajectory, inputs).get()
-        return tempResults
+        results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
+
+        f = open(outfile, "w+")
+        f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
+        f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
+        f.close()
+
+        # pool = Pool()
+        # tempResults = pool.amap(self.get_trajectory, inputs).get()
+        # return tempResults
+
+
+    # def showWalls(self, outfile):
+    #     '''
+    #     Generate a scatter plot of final positions of molecules as determined by
+    #     the endPosition function parameters.
+    #     '''
+    #     print("Started showWalls")
+    #
+    #     #The knownGeometries array stores the default end position for each geometry
+    #     #as one of the parameters.
+    #     default_endPos = self._knownGeometries[self._geometry][1]
+    #
+    #     #N=(PARTICLE_NUMBER) jobs, each with the parameter endPos set to default_endPos
+    #     inputs = np.ones(self._PARTICLE_NUMBER) * default_endPos
+    #
+    #     results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
+    #     #    with Pool(processes=100) as pool:
+    #     #        results = pool.map(endPosition, inputs, 1)
+    #
+    #     f = open(outfile, "w+")
+    #     f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
+    #     f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
+    #     f.close()
 
 
     def nonparallel_main(self):
@@ -504,7 +550,7 @@ class ParticleTracing(object):
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
 
-        elif corrected == 1:
+        elif correc == 1:
             '''
             "Biased" thermal speed distribution. An extra factor of v enters the PDF,
             accounting for the velocity-dependent probability of collision.
@@ -612,28 +658,7 @@ class ParticleTracing(object):
 
         return vx, vy, vz
 
-    def showWalls(self, outfile):
-        '''
-        Generate a scatter plot of final positions of molecules as determined by
-        the endPosition function parameters.
-        '''
-        print("Started showWalls")
 
-        #The knownGeometries array stores the default end position for each geometry
-        #as one of the parameters.
-        default_endPos = self._knownGeometries[self._geometry][1]
-
-        #N=(PARTICLE_NUMBER) jobs, each with the parameter endPos set to default_endPos
-        inputs = np.ones(self._PARTICLE_NUMBER) * default_endPos
-
-        results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
-        #    with Pool(processes=100) as pool:
-        #        results = pool.map(endPosition, inputs, 1)
-
-        f = open(outfile, "w+")
-        f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
-        f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
-        f.close()
 
 def get_flow_chars(filename):
     '''
@@ -874,26 +899,26 @@ if __name__ == '__main__':
     parser.add_argument('--init_mode', type=int, dest='init_mode', action='store', help='Code number for initial particle distributions')
     parser.add_argument('--probe_mode', dest='probe_mode', action='store_true', help='Set TRUE if only particles final locations are needed')
     # parser.add_argument('--correc', dest='correc', action='store', help='Specify whether to use *corrected* velocity distribution')
-    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False, correc=1) #Defaults to LITE_MODE=False, 1 particle and crossMult=5
+    parser.set_defaults(lite=False, mult=5, npar=1, init_mode=0, probe_mode=False, correc=1) #Defaults to LITE_MODE=False, 1 particle and CROSS_MULT=5
     args = parser.parse_args()
 
     flowField = args.ff
     outfile = args.out
 
     NPAR = args.npar
-    crossMult = args.mult
+    CROSS_MULT = args.mult
     LITE_MODE = args.lite
     INIT_COND = args.init_mode
     PROBE_MODE = args.probe_mode
 
     CORRECTION = 1 #CORRECTION=1 sets which distributions/sampling methods are to be used in sampling particle data
 
-    sim = ParticleTracing(flowField, NPAR, crossMult, LITE_MODE, INIT_COND, PROBE_MODE, CORRECTION)
+    sim = ParticleTracing(flowField, NPAR, CROSS_MULT, LITE_MODE, INIT_COND, PROBE_MODE, CORRECTION)
 
-    print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_COND {3}".format(NPAR, crossMult, LITE_MODE, INIT_COND))
+    print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_COND {3}".format(NPAR, CROSS_MULT, LITE_MODE, INIT_COND))
     print("PROBE_MODE {}".format(PROBE_MODE))
 
-    sim.showWalls(outfile)
+    sim.main(outfile)
     # results = sim.nonparallel_main()
     # f = open(outfile, 'w+')
     # f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
