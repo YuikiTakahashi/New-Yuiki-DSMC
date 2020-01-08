@@ -26,6 +26,7 @@ M_HE = 0.004 / NA # Helium gas particle mass (kg)
 M_S = .190061 / NA # Species mass (kg)
 M_RED = (M_HE * M_S) / (M_HE + M_S)
 MASS_PARAM = 2 * M_HE / (M_HE + M_S)
+CROSS_HE = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
 
 # self._m = 0.004 / NA # Helium gas particle mass (kg)
 # self._M = .190061 / NA # Species mass (kg)
@@ -89,8 +90,8 @@ class ParticleTracing(object):
         # =============================================================================
         # Use the CROSS_MULT parameter to tune the He-Species collision cross section.
         # =============================================================================
-        cross_He = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
-        self._cross = 20 * CROSS_MULT * cross_He # Rough estimate of He-YbOH cross section area.
+
+        self._cross = 20 * CROSS_MULT * CROSS_HE # Rough estimate of He-YbOH cross section area.
 
         # vMean = 2 * (2 * KB * 4 / (M_HE * np.pi))**0.5 #Mean velocity for 4K helium gas
         # self._theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
@@ -161,11 +162,29 @@ class ParticleTracing(object):
             raise ValueError('Could not load flow field')
 
 
-    # def set_sim_params(flowFieldName=None, NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
-    #     loc = locals()
-    #     for arg in loc:
-    #         if loc != None
+    def set_sim_params(NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
+        '''
+        Update/reset the ParticleTracing object parameters
+        '''
 
+        if NPAR != None:
+            self._PARTICLE_NUMBER = NPAR #Number of particles to simulate
+
+        if CROSS_MULT != None:
+            self._CROSS_MULT = CROSS_MULT #Fine-tuning colllision cross section parameter
+            self._cross = 20 * CROSS_MULT * CROSS_HE # Rough estimate of He-YbOH cross section area.
+
+        if LITE_MODE != None:
+            self._LITE_MODE = LITE_MODE #If True, does not record particle trajectory until close to the aperture.
+
+        if INIT_COND != None:
+            self._INIT_COND = INIT_COND #Initial conditions "type" selected for the molecules
+
+        if PROBE_MODE != None:
+            self._PROBE_MODE = PROBE_MODE #If True, records the molecules initial and final positions ONLY
+
+        if CORRECTION != None:
+            self._CORRECTION = CORRECTION
 
 ###############################################################################
 # MAIN PROGRAM METHODS
@@ -173,13 +192,13 @@ class ParticleTracing(object):
 
     def get_trajectory(self, boundary):
         '''
-        To be run in parallel in the self.main class method.
+        To be run in parallel in the self.parallel_main class method.
         Computes one molecule trajectory, returns it as list.
         '''
         return self.track_molecules(endPos=boundary, numTraj=1)
 
 
-    def main(self, outfile):
+    def parallel_main(self, outfile):
         '''
         Uses parallelization library to compute several molecule
         trajectories and write the results to an output file.
@@ -189,10 +208,11 @@ class ParticleTracing(object):
         default_endPos = self._knownGeometries[self._geometry][1]
 
         inputs = np.ones(self._PARTICLE_NUMBER) * default_endPos
+        f = open(outfile, "w+")
 
         results = Parallel(n_jobs=-1,max_nbytes=None,verbose=50)(delayed(self.get_trajectory)(i) for i in inputs)
 
-        f = open(outfile, "w+")
+
         f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
         f.write(''.join(map(str, list(itertools.chain.from_iterable(results)))))
         f.close()
@@ -918,7 +938,7 @@ if __name__ == '__main__':
     print("Particle number {0}, crossmult {1}, LITE_MODE {2}, INIT_COND {3}".format(NPAR, CROSS_MULT, LITE_MODE, INIT_COND))
     print("PROBE_MODE {}".format(PROBE_MODE))
 
-    sim.main(outfile)
+    sim.parallel_main(outfile)
     # results = sim.nonparallel_main()
     # f = open(outfile, 'w+')
     # f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')

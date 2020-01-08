@@ -835,7 +835,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
 
 #    directory = '/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/'
-    directory = '/Users/gabri/Desktop/HutzlerSims/New_DSMC/'
+#    directory = '/Users/gabri/Desktop/HutzlerSims/New_DSMC/'
+    directory = 'Data/'
 
     folder_sw = {'TimeColumn':'TimeColumn/{}_lite.dat',\
                   'InitLarge':'InitLarge/{}_init1.dat',\
@@ -856,10 +857,14 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
              'GenCompare1' : 'GenCompare1/{}.dat',\
              'GenCompare2' : 'GenCompare2/{}.dat',\
              'GenCompare3' : 'GenCompare3/{}.dat'\
+#             'FCellTesting': 'FCellTesting/{}.dat'\
                 }
 
     #Nx6 array. Organized by x,y,z,vx,vy,vz
-    f = np.loadtxt(directory+ (folder_sw[folder]).format(file_ext), skiprows=1)
+    if folder in folder_sw:
+        f = np.loadtxt(directory+ (folder_sw[folder]).format(file_ext), skiprows=1)
+    else:
+        f = np.loadtxt(directory+folder+'/{}.dat'.format(file_ext),skiprows=1)
 
 #    flowrate = {'traj017d':5, 'traj018':20, 'traj019':50, 'traj020':10, 'traj021':2,\
 #                'traj022':100, 'traj023':200,'flow_17':5,'flow_18_a':20,\
