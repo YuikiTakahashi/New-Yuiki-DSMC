@@ -34,13 +34,13 @@ def main():
 
     plot_dens()
 
+
 def set_many():
-    flist = ['002','100']
+    flist = ['010','020','050']
     for f in flist:
         set_params(FF='F_Cell/DS2f{}.DAT'.format(f))
-        set_params(FF='M_Cell/DS2m{}.DAT'.format(f))
-        set_params(FF='N_Cell/DS2n{}.DAT'.format(f))
-        set_params(FF='P_Cell/DS2p{}.DAT'.format(f))
+        set_params(FF='S_Cell/DS2s{}.DAT'.format(f))
+        
 
 def set_params(FF='F_Cell/DS2f005.DAT', x=0, y=0):
     global fdens, fmfp, ftemp, fvz, fvr, fvp, Z_INFINITE, X0, Y0, SIZE, SIGMA
@@ -85,7 +85,7 @@ def set_field(FF):
         print("Block 1: density and temperature")
 
         #Recall FF e.g.= F_Cell/DS2f200.DAT or G_Cell/DS2g005.DAT
-        if FF[10] in ['f', 'g', 'n']:
+        if FF[10] in ['f', 'g', 'n', 't', 's']:
             print('{} geometry grid'.format(FF[10]))
             grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
 
@@ -359,14 +359,16 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
     for flow in flowList:
         if flow not in legends:
             flowtype = {'f' : 'Standard ',\
+                        's' : 'Hard Sphere ',\
                         'g' : 'Bevel G ',\
                         'h' : 'Hourglass ',\
                         'k' : 'Laval K',\
                         'p' : 'Slowing P ',\
                         'm' : 'Slowing M ',\
-                        'n' : 'Slowing N '}[flow[0]]
+                        'n' : 'Slowing N ',\
+                        't' : 'Tube Input '}[flow[0]]
 #            flowtype=''
-            flowrate = '('+str(int(flow[1:4]))+' SCCM)'
+            flowrate = ' ('+str(int(flow[1:4]))+' SCCM)'
             legends.update( {flow : flowtype+flowrate})
 
     for f in flowList:
@@ -386,7 +388,7 @@ def multi_plot_quant(quantity='dens', flowList=['f005','g200'], z0=0.010, zf=0.1
 
     plt.xlabel('Z distance from aperture [mm]')
     plt.axvline(x=64-64)
-    plt.axvline(x=73-64)
+#    plt.axvline(x=73-64)
     plt.legend()
     plt.show()
 

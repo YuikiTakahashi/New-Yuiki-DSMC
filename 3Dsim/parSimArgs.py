@@ -9,6 +9,9 @@ This is an auxiliary file containing only a specific set of parameters and
 functionalities desired for processing on the HPC cluster.
 """
 
+import cProfile
+import re
+
 import numpy as np
 import scipy.stats as st
 import scipy.interpolate as si
@@ -81,7 +84,9 @@ def set_derived_quants():
 def get_flow_chars(filename):
     '''
     Retrieves the cell geometry and flowrate (in SCCM) from the FF filename.
-    The cell geometry is crucial for the simulation to work!
+
+    Alternatively, this method can be overwritten to hard-code the cell geometry
+    and flow rate on each use, ignoring the flow-field filename.
     '''
     global flowrate, geometry
 
@@ -94,8 +99,15 @@ def get_flow_chars(filename):
 
     else:
         raise ValueError('Could not recognize the DS2 flow file')
-    print(geometry)
-    print(flowrate)
+
+    # ***** Alternatively ********* #
+
+    # geometry = 'xCell'
+    # flowrate = 10
+
+    # ***************************** #
+
+
 
 # =============================================================================
 # Probability Distribution Functions
@@ -357,15 +369,15 @@ def getAmbientVelocity(precision=4, width=700, simple=1):
 
 
 
-    width = int(width/precision) # scale for mesh
-    probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
-                            p=precision, w=width).flatten()
-    inds = np.linspace(0, len(probs)-1, len(probs))
-    choice = np.random.choice(inds, p=probs/np.sum(probs))
-    ind3D = np.where(np.reshape(inds, (width, width, width)) == choice)
-    z_ind, y_ind, x_ind = int(ind3D[0]), int(ind3D[1]), int(ind3D[2])
-    z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
-    return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
+    #width = int(width/precision) # scale for mesh
+    #probs = np.fromfunction(coll_vel_index_pdf, (width, width, width), \
+    #                        p=precision, w=width).flatten()
+    #inds = np.linspace(0, len(probs)-1, len(probs))
+    #choice = np.random.choice(inds, p=probs/np.sum(probs))
+    #ind3D = np.where(np.reshape(inds, (width, width, width)) == choice)
+    #z_ind, y_ind, x_ind = int(ind3D[0]), int(ind3D[1]), int(ind3D[2])
+    #z, y, x = precision*(z_ind - width/2), precision*(y_ind - width/2), precision*(x_ind - width/2)
+    #return x + xFlow - vx, y + yFlow - vy, z + zFlow - vz
 
 def initial_species_velocity(mode=1):
     '''

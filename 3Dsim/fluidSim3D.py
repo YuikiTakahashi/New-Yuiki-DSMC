@@ -788,6 +788,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     print('The aperture is at z = 0.064 m.')
 
 #    PREV_AP_RAD = 1.167
+    
+    
 
     try:
         PREV_AP_RAD = MEDIAN_APERTURE_RADII[file_ext] #mm
@@ -1199,7 +1201,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #     tc.close()
 
     if write == 1 and rad_mode==True:
-        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+write_file), 'a') as tc:
+        with open(directory+folder+'/'+write_file, 'a') as tc:
             tc.write('  '.join(map(str, [dome_rad0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
@@ -1209,7 +1211,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
     #These two are identical except for reporting the dome radius (dome_rad0) versus the plane distance (pos0)
     elif write == 1 and rad_mode==False:
-        with open('/Users/gabri/Box/HutzlerLab/Data/Woolls_BG_Sims/{}'.format(folder+'/'+write_file), 'a') as tc:
+        with open(directory+folder+'/'+write_file, 'a') as tc:
             tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\

@@ -3,6 +3,13 @@
 """
 Created August 2019
 @author: Gabriel
+
+Contains the main simulation class, ParticleTracing() to carry out parallelized
+molecule path-tracing simulations through a buffer gas (DSMC-generated) flow field.
+
+Optimization left to do:
+*Parallelization library (joblib is finnicky)
+*Collision updating (can trim random number generation)
 """
 
 import numpy as np
@@ -44,7 +51,7 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=1):
+    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=0):
 
         #Set as 1 for basic vel_pdf (default prior to 08/2019)
         #Set as 2 for vel_corrected_pdf
@@ -162,7 +169,7 @@ class ParticleTracing(object):
             raise ValueError('Could not load flow field')
 
 
-    def set_sim_params(NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
+    def set_sim_params(self, NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
         '''
         Update/reset the ParticleTracing object parameters
         '''
@@ -746,7 +753,7 @@ class Theta_pdf(st.rv_continuous):
     def _pdf(self,x):
         return -np.cos(x)  # Normalized over its range [pi/2, pi]
 
-def collisionVelPDF(x, T, m=M_RED):
+def collisionVelPDF(x, T, m= M_RED):
     return (m**2)/(2 * KB**2 * T**2) * x**3 * np.exp(-m*x**2/(2*KB*T)) #PDF for relative speed, evaluated at y
 
 
