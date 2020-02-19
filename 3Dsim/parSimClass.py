@@ -53,8 +53,8 @@ class ParticleTracing(object):
 
     def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=0):
 
-        #Set as 1 for basic vel_pdf (default prior to 08/2019)
-        #Set as 2 for vel_corrected_pdf
+        #Set as 0 for basic Maxwell-Boltzmann PDF
+        #Set as 1 for corrected PDF
         self._CORRECTION = CORRECTION
 
         #Label all known geometries and map to a tuple (default_aperture, default_endPos)
@@ -576,6 +576,14 @@ class ParticleTracing(object):
             #                    *np.sin(phi), v0*np.cos(theta))
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
+        elif correc == 2:
+            '''Debug'''
+            v0 = self._max_boltz_cv.rvs(m=M_HE, T=temp)
+            theta = self._theta_cv.rvs()
+            phi = np.random.uniform(0, 2*np.pi)
+            Vx, Vy, Vz = (v0*np.sin(theta)*np.cos(phi), v0*np.sin(theta)\
+                               *np.sin(phi), v0*np.cos(theta))
+            return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
         elif correc == 1:
             '''
@@ -591,10 +599,15 @@ class ParticleTracing(object):
             #                    *np.sin(phi), v0*np.cos(theta))
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
-            vxGas = xFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
-            vyGas = yFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
-            vzGas = zFlow + self.particle_generator(prop='Coll_Rel_Vel', T=temp)
+            vMag = self.particle_generator(prop='Coll_Rel_Vel',T=temp)
+            theta = self.particle_generator(prop='Theta')
+            phi = 2 * np.pi * np.random.uniform(0,1)
+
+            vxGas = xFlow + vMag*np.sin(theta)*np.cos(phi)
+            vyGas = yFlow + vMag*np.sin(theta)*np.sin(phi)
+            vzGas = zFlow + vMag*np.cos(theta)
             return vxGas - vx, vyGas - vy, vzGas - vz
+
 
         else:
             raise ValueError('Unknown CORRECTION')
@@ -651,7 +664,15 @@ class ParticleTracing(object):
             v = accept_reject_gen(pdf=f, xmin=0, xmax=5*vMean, pmax=fMax)
             return v[0]
 
+        elif prop == 'Theta':
+            '''
+            Return theta distributed like ~sin(theta)/2
+            '''
+            r1 = np.random.uniform(0,1)
+            theta = np.arccos(1 - 2*r1)
+            return theta
 
+        else: raise ValueError('Incorrect property in generator')
 
     def collide(self, temp, v_flow, v_mol):
         '''
