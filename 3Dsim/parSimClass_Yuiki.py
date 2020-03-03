@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
+Modified by Yuiki Takahashi in 2020
+
 Created August 2019
 @author: Gabriel
 
@@ -12,6 +14,7 @@ Optimization left to do:
 *Collision updating (can trim random number generation)
 """
 
+import math
 import numpy as np
 import scipy.stats as st
 import scipy.interpolate as si
@@ -22,6 +25,8 @@ import itertools
 import argparse
 import sys
 import joblib.parallel
+from scipy.stats import uniform
+from numpy import random, linalg
 
 ###############################################################################
 # CONSTANTS
@@ -33,8 +38,13 @@ M_HE = 0.004 / NA # Helium gas particle mass (kg)
 M_S = .190061 / NA # Species mass (kg)
 M_RED = (M_HE * M_S) / (M_HE + M_S)
 MASS_PARAM = 2 * M_HE / (M_HE + M_S)
-CROSS_HE = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
-#CROSS_HE = 100*10**(-20)
+#CROSS_YBF = 20 * 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
+CROSS_YBF = 100*10**(-20) #YbF-He cross section at 20 K (m^2) 
+# YbOH mass in amu
+mass = 173 + 16 + 1  
+# buffer gass mass (He) in amu
+bgmass = 4
+
 # self._m = 0.004 / NA # Helium gas particle mass (kg)
 # self._M = .190061 / NA # Species mass (kg)
 # self._massParam = 2 * m / (m + M)
@@ -42,7 +52,7 @@ CROSS_HE = 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
 ###############################################################################
 # SIMULATION CLASS
 ###############################################################################
-class ParticleTracing(object):
+class ParticleTracing_Yuiki(object):
     '''
     Main simulation class. Simulates path of a YbOH molecule through
     a helium buffer gas cell.
@@ -51,7 +61,7 @@ class ParticleTracing(object):
     gas flow field, etc.
     '''
 
-    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=0):
+    def __init__(self, flowFieldName='flows/F_Cell/DS2f005.DAT', NPAR=10, CROSS_MULT=1, LITE_MODE=True, INIT_COND=0, PROBE_MODE=False, CORRECTION=1):
 
         #Set as 0 for basic Maxwell-Boltzmann PDF
         #Set as 1 for corrected PDF
@@ -98,8 +108,8 @@ class ParticleTracing(object):
         # Use the CROSS_MULT parameter to tune the He-Species collision cross section.
         # =============================================================================
 
-        #self._cross = 20 * CROSS_MULT * CROSS_HE # Rough estimate of He-YbOH cross section area.
-        self._cross = 20*CROSS_MULT*CROSS_HE
+        self._cross = CROSS_YBF # Rough estimate of He-YbOH cross section area.
+
         # vMean = 2 * (2 * KB * 4 / (M_HE * np.pi))**0.5 #Mean velocity for 4K helium gas
         # self._theta_cv = theta_pdf(a=0, b=np.pi, name='theta_pdf') # theta_cv.rvs() for value
         self._Theta_cv = Theta_pdf(a=np.pi/2, b=np.pi, name='Theta_pdf') # Theta_cv.rvs() for value
@@ -179,7 +189,7 @@ class ParticleTracing(object):
 
         if CROSS_MULT != None:
             self._CROSS_MULT = CROSS_MULT #Fine-tuning colllision cross section parameter
-            self._cross = 20 * CROSS_MULT * CROSS_HE # Rough estimate of He-YbOH cross section area.
+            self._cross = CROSS_YBF # Rough estimate of He-YbOH cross section area.
 
         if LITE_MODE != None:
             self._LITE_MODE = LITE_MODE #If True, does not record particle trajectory until close to the aperture.
@@ -253,15 +263,19 @@ class ParticleTracing(object):
     #     f.close()
 
 
-    def nonparallel_main(self):
-        print("CORRECTION = {}".format(self._CORRECTION))
+    def nonparallel_main(self, outfile):
+#        print("CORRECTION = {}".format(self._CORRECTION))
 
         particleNum = self._PARTICLE_NUMBER
         cellGeometry = self._geometry
         default_endPos = self._knownGeometries[cellGeometry][1]
+        f = open(outfile, "w+")
 
         tempResults = self.track_molecules(endPos=default_endPos, numTraj=particleNum)
-        return tempResults
+        f.write('x (mm)   y (mm)   z (mm)   vx (m/s)   vy (m/s)   vz (m/s)   time (ms)   dens\n')
+        f.write(''.join(map(str, list(itertools.chain.from_iterable(tempResults)))))
+        f.close()
+#        return tempResults
 
 
     #Returns traj, a list of strings containing position, velocity and times
@@ -358,7 +372,7 @@ class ParticleTracing(object):
         '''
         T = temp #Buffer gas temperature
         n = dens #Buffer gas number density
-        m = M_HE #Helium atom mass
+        m = M_RED #Reduced mass of He and YbOH
 
         cross = self._cross #He-YbOH cross section
         collProb = self._collProb #Set probability of molecule-atom collision
@@ -442,6 +456,19 @@ class ParticleTracing(object):
             Vx = np.cos(rot) * vPerpCw + np.sin(rot) * vr
             Vy = -np.sin(rot) * vPerpCw + np.cos(rot) * vr
             return np.array([Vx, Vy, Vz])
+        
+    # Generate "num_points" random points in "dimension" that have uniform probability over the unit ball scaled by "radius" (length of points are in range [0, "radius"]).
+    def random_ball(self, num_points, dimension, radius):
+
+        # generate random directions by normalizing the length of a vector of random-normal values
+        random_directions = random.normal(size=(dimension, num_points))
+        random_directions /= linalg.norm(random_directions, axis=0)
+
+        # Second generate a random radius with probability proportional to the volume of a ball with a given radius.
+        random_radii = random.random(num_points) ** (1/(dimension))
+
+        # Return the list of random (direction & length) points.
+        return radius * (random_directions * random_radii).T
 
 
     def initial_species_position(self):
@@ -453,6 +480,7 @@ class ParticleTracing(object):
         * INIT_COND 2: 5000K ablation
         * INIT_COND 9: Full cell F
         * INIT_COND 11: Full cell H
+        * INIT_COND 12: 1 cm diamter ball (the center is z = 0.034 m)
         '''
         #Retrieve which pre-specified type of initial conditions
         #were chosen for this simulation
@@ -493,7 +521,13 @@ class ParticleTracing(object):
         elif mode==2:
             x, y = -0.00635+0.0001, 0
             z = np.random.uniform(0.035,0.040)
-
+        
+        # 1 cm (= 0.01 m) diamter uniform ball (the center of the ball is z = 0.034 m)
+        elif mode==12:
+            r = self.random_ball(1, 3, 0.005)
+            x, y, znew = r[0]
+            z = znew + 0.034
+            
         else:
             raise ValueError('Did not recognize INIT_COND {}'.format(mode))
 
@@ -514,7 +548,7 @@ class ParticleTracing(object):
         # global T_s
         init_cond = self._INIT_COND
         #These initial conditions assume the molecules begin thermalized with the 4K environment
-        if init_cond in [0, 1, 9, 11]:
+        if init_cond in [0, 1, 9, 11, 12]:
             T_s = 4.0 #species temperature: assume 4K thermalization
 
             Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
@@ -577,7 +611,7 @@ class ParticleTracing(object):
             # return Vx + xFlow - vx, Vy + yFlow - vy, Vz + zFlow - vz
 
         elif correc == 2:
-            '''Debug'''
+            '''DO NOT USE! Just for Debug'''
             v0 = self._max_boltz_cv.rvs(m=M_HE, T=temp)
             theta = self._theta_cv.rvs()
             phi = np.random.uniform(0, 2*np.pi)
@@ -674,35 +708,78 @@ class ParticleTracing(object):
 
         else: raise ValueError('Incorrect property in generator')
 
+#     def collide(self, temp, v_flow, v_mol):
+#         '''
+#         For current values of position (giving ambient flow rate) and velocity,
+#         increment vx, vy, vz according to collision physics.
+#         '''
+#         massParam = MASS_PARAM
+
+#         vx, vy, vz = v_mol[0], v_mol[1], v_mol[2]
+#         Theta = self._Theta_cv.rvs()
+#         Phi = np.random.uniform(0, 2*np.pi)
+
+#         vx_amb, vy_amb, vz_amb = self.get_ambient_velocity(temp, v_flow, v_mol)
+
+#         v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
+#         B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
+
+#         vx += (v_amb * massParam * np.cos(Theta) * \
+#                (np.sin(Theta) * np.cos(Phi) * B * (vx_amb-v_amb**2/vx_amb)\
+#                 + vx_amb * np.cos(Theta)/v_amb))
+
+#         vy += (v_amb * massParam * np.cos(Theta) * \
+#                (np.sin(Theta)*np.cos(Phi)*B*vy_amb + np.sin(Theta)*np.sin(Phi)*\
+#                 (vz_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb)-vx_amb*B*vz_amb/v_amb)\
+#                 + np.cos(Theta)*vy_amb/v_amb))
+
+#         vz += (v_amb * massParam * np.cos(Theta) * \
+#                (np.sin(Theta)*np.cos(Phi)*B*vz_amb + np.sin(Theta)*np.sin(Phi)*\
+#                 (vx_amb*B*vy_amb/v_amb-vy_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb))\
+#                 + np.cos(Theta)*vz_amb/v_amb))
+
+#         return vx, vy, vz
+    
+    
+    
     def collide(self, temp, v_flow, v_mol):
         '''
         For current values of position (giving ambient flow rate) and velocity,
-        increment vx, vy, vz according to collision physics.
+        increment vx, vy, vz according to collision physics. Assuming Hard-Sphere Scattering.
         '''
-        massParam = MASS_PARAM
 
         vx, vy, vz = v_mol[0], v_mol[1], v_mol[2]
-        Theta = self._Theta_cv.rvs()
-        Phi = np.random.uniform(0, 2*np.pi)
 
         vx_amb, vy_amb, vz_amb = self.get_ambient_velocity(temp, v_flow, v_mol)
 
-        v_amb = (vx_amb**2 + vy_amb**2 + vz_amb**2)**0.5
-        B = (vy_amb**2 + vz_amb**2 + (vx_amb-v_amb**2/vx_amb)**2)**-0.5
+        Cx = vx + vx_amb
+        Cy = vy + vy_amb
+        Cz = vz + vz_amb
+        Wx = mass/(mass + bgmass)*vx + bgmass/(mass + bgmass)*Cx
+        Wy = mass/(mass + bgmass)*vy + bgmass/(mass + bgmass)*Cy
+        Wz = mass/(mass + bgmass)*vz + bgmass/(mass + bgmass)*Cz
 
-        vx += (v_amb * massParam * np.cos(Theta) * \
-               (np.sin(Theta) * np.cos(Phi) * B * (vx_amb-v_amb**2/vx_amb)\
-                + vx_amb * np.cos(Theta)/v_amb))
+        r1 = uniform.rvs(0,1)
+        r2 = uniform.rvs(0,1)
 
-        vy += (v_amb * massParam * np.cos(Theta) * \
-               (np.sin(Theta)*np.cos(Phi)*B*vy_amb + np.sin(Theta)*np.sin(Phi)*\
-                (vz_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb)-vx_amb*B*vz_amb/v_amb)\
-                + np.cos(Theta)*vy_amb/v_amb))
+        coschai = 2*r1-1
+        sinchai = math.sqrt(1-coschai**2)
+        theta = 2*math.pi*r2
 
-        vz += (v_amb * massParam * np.cos(Theta) * \
-               (np.sin(Theta)*np.cos(Phi)*B*vz_amb + np.sin(Theta)*np.sin(Phi)*\
-                (vx_amb*B*vy_amb/v_amb-vy_amb/v_amb*B*(vx_amb-v_amb**2/vx_amb))\
-                + np.cos(Theta)*vz_amb/v_amb))
+        g = math.sqrt( (vx-Cx)**2 + (vy-Cy)**2 +(vz-Cz)**2 )
+        gx = g*coschai
+        gy = g*sinchai*math.cos(theta)
+        gz = g*sinchai*math.sin(theta)
+
+        v_colx = Wx + bgmass/(mass + bgmass)*gx - vx
+        v_coly = Wy + bgmass/(mass + bgmass)*gy - vy
+        v_colz = Wz + bgmass/(mass + bgmass)*gz - vz
+
+        vx += v_colx
+
+        vy += v_coly
+
+        vz += v_colz
 
         return vx, vy, vz
 
