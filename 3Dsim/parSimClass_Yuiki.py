@@ -151,33 +151,34 @@ class ParticleTracing_Yuiki(object):
             quantHolder = [zs, rs, dens, temps, vzs, vrs, vps]
 
             if geometry in ['fCell', 'gCell', 'nCell', 'qCell', 'rCell']:
-                grid_x, grid_y = np.mgrid[0.010:0.12:4500j, 0:0.030:1500j] # high density, to be safe.
+                grid_x, grid_y = np.mgrid[0.010:0.12:2250j, 0:0.030:750j] # high density, to be safe. Was 4500 x 1500 points
             elif geometry in ['hCell', 'jCell', 'kCell', 'mCell']:
                 grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
             elif geometry in ['pCell']:
                 grid_x, grid_y = np.mgrid[0.010:0.20:9400j, 0:0.030:1500j] # high density, to be safe.
+            elif geometry in ['tCell', 'sCell']: # cases added by Ben, 2/19/2020
+                grid_x, grid_y = np.mgrid[0.005:0.12:4500j, 0:0.030:1000j]
             else:
                 raise ValueError('Unknown geometry')
 
             print("Loading grids ... ")
-            grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens), (grid_x, grid_y), 'nearest')
+            grid_dens = si.griddata(np.transpose([zs, rs]), np.log(dens + 1.0), (grid_x, grid_y), 'nearest') # the +1.0 inside the log is to make sure the log-density never goes negative.
             grid_temps = si.griddata(np.transpose([zs, rs]), temps, (grid_x, grid_y), 'nearest')
             grid_vzs = si.griddata(np.transpose([zs, rs]), vzs, (grid_x, grid_y), 'nearest')
             grid_vrs = si.griddata(np.transpose([zs, rs]), vrs, (grid_x, grid_y), 'nearest')
             grid_vps = si.griddata(np.transpose([zs, rs]), vps, (grid_x, grid_y), 'nearest')
 
             print("Interpolating ... ",end='')
-            self._fDens = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens)
-            self._fTemp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps)
-            self._fVz = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs)
-            self._fVr = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs)
-            self._fVp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps)
+            self._fDens = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_dens, kx=1, ky=1)
+            self._fTemp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_temps, kx=1, ky=1)
+            self._fVz = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vzs, kx=1, ky=1)
+            self._fVr = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vrs, kx=1, ky=1)
+            self._fVp = si.RectBivariateSpline(grid_x[:, 0], grid_y[0], grid_vps, kx=1, ky=1)
 
             print("Flow field loaded")
 
         except:
             raise ValueError('Could not load flow field')
-
 
     def set_sim_params(self, NPAR=None, CROSS_MULT=None, LITE_MODE=None, INIT_COND=None, PROBE_MODE=None, CORRECTION=None):
         '''
