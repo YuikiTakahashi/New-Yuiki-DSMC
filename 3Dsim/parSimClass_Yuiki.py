@@ -83,7 +83,8 @@ class ParticleTracing_Yuiki(object):
                            'nCell' : (0.073, 0.14),\
                            'pCell' : (0.0726, 0.2),\
                            'qCell' : (0.064, 0.12),\
-                           'rCell' : (0.064, 0.12)\
+                           'rCell' : (0.064, 0.12),\
+                           'yCell' : (0.053, 0.12)\
                            }
 
         #Probability of collision, set at 1/10. Higher probability means finer time-step
@@ -156,7 +157,7 @@ class ParticleTracing_Yuiki(object):
                 grid_x, grid_y = np.mgrid[0.010:0.24:9400j, 0:0.030:1500j] # high density, to be safe.
             elif geometry in ['pCell']:
                 grid_x, grid_y = np.mgrid[0.010:0.20:9400j, 0:0.030:1500j] # high density, to be safe.
-            elif geometry in ['tCell', 'sCell']: # cases added by Ben, 2/19/2020
+            elif geometry in ['tCell', 'sCell', 'yCell']: # cases added by Ben, 2/19/2020
                 grid_x, grid_y = np.mgrid[0.005:0.12:4500j, 0:0.030:1000j]
             else:
                 raise ValueError('Unknown geometry')
@@ -433,7 +434,7 @@ class ParticleTracing_Yuiki(object):
         '''
         temp = self.dsmc_quant(x, y, z, 'temp')
         return temp
-
+    
     def dsmc_quant(self, x0, y0, z0, quant):
         '''
         Return quantity (quant) evaluated at the given location in the cell.
@@ -459,17 +460,18 @@ class ParticleTracing_Yuiki(object):
             return np.array([Vx, Vy, Vz])
         
     # Generate "num_points" random points in "dimension" that have uniform probability over the unit ball scaled by "radius" (length of points are in range [0, "radius"]).
-    def random_ball(self, num_points, dimension, radius):
+    def random_ball(self, radius):
 
         # generate random directions by normalizing the length of a vector of random-normal values
-        random_directions = random.normal(size=(dimension, num_points))
+        random_directions = random.normal(size=(3, 1))
         random_directions /= linalg.norm(random_directions, axis=0)
 
-        # Second generate a random radius with probability proportional to the volume of a ball with a given radius.
-        random_radii = random.random(num_points) ** (1/(dimension))
-
+        # gaussian distrbiution over the radius with 3 sigma.
+        random_radii = 100 
+        while random_radii >3:
+            random_radii = abs(random.normal(0,1,1)) 
         # Return the list of random (direction & length) points.
-        return radius * (random_directions * random_radii).T
+        return radius/3 * (random_directions * random_radii).T
 
 
     def initial_species_position(self):
@@ -525,7 +527,7 @@ class ParticleTracing_Yuiki(object):
         
         # 1 cm (= 0.01 m) diamter uniform ball (the center of the ball is z = 0.034 m)
         elif mode==12:
-            r = self.random_ball(1, 3, 0.005)
+            r = self.random_ball(0.005)
             x, y, znew = r[0]
             z = znew + 0.034
             
@@ -798,7 +800,7 @@ def get_flow_chars(filename):
     if filename[13:16] == "DS2":
         geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell",\
                     'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell",\
-                    'q':"qCell", 'r':"rCell"}[filename[16]]
+                    'q':"qCell", 'r':"rCell", 'y':"yCell"}[filename[16]]
         flowrate = int(filename[17:20])
 
     else:
@@ -1005,6 +1007,13 @@ def inBounds(x, y, z, cell=None, endPos=0.12):
         in1 = r < 0.00635 and z > 0.015 and z < 0.0635
         in2 = r < 0.0025 and z > 0.0635 and z < 0.0640
         in3 = r < 0.030 and z >= 0.0640 and z < endPos
+        inside = in1 + in2 + in3
+        return inside 
+    
+    elif cell == 'yCell':
+        in1 = r < 0.00635 and z > 0.015 and z < 0.0531
+        in2 = r < 0.0025 and z > 0.0531 and z < 0.0536
+        in3 = r < 0.030 and z >= 0.0536 and z < endPos
         inside = in1 + in2 + in3
         return inside
 

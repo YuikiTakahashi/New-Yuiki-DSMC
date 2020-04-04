@@ -787,7 +787,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     The argument file_ext is expected to be in the xyyy.DAT format, where x gives the geometry and
     yyy gives the flowrate in SCCM; e.g. f002.DAT is geometry "f" with 2 SCCM flow.
     '''
-    print('The aperture is at z = 0.064 m.')
+    
 
 #    PREV_AP_RAD = 1.167
     
@@ -799,16 +799,18 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     except:
         PREV_AP_RAD = 0.0
 
-    #This should be 120 for F and G geometries, 240 for H, J, K geometries
-    DEFAULT_ENDPOS = {'f':120, 'g':120,\
+    #This should be 120 for F,G and Y geometries, 240 for H, J, K geometries
+    DEFAULT_ENDPOS = {'f':120, 'g':120, 'y':120,\
                       'h':240, 'j':240, 'k':240, 'm':240,\
                       'p':200, 'n':140, 'q':120, 'r':120}[file_ext[0]]
 
     #0.064 for f and g cell geometries, 0.06785 for h, j, k cells. Only matters for print
     #output, not for data analysis
-    DEFAULT_APERTURE = {'f':0.064, 'g':0.064,\
+    DEFAULT_APERTURE = {'f':0.064, 'g':0.064,'y':0.0536,\
                         'h':0.06785, 'j':0.06785, 'k':0.06785, 'm':0.06785,\
                         'p':0.0726,'n':0.073,'q':0.064, 'r':0.064}[file_ext[0]]
+    
+    print('The aperture is at z = %g m.'%DEFAULT_APERTURE)
 
     #64 mm for f/g, 67.85mm for h
     z_center=1000*DEFAULT_APERTURE
@@ -816,7 +818,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     y_center=0  #Coordinates of bowl center
 
 
-
+    pos = DEFAULT_APERTURE+0.03
     pos0 = pos
     pos *= 1000 # trajectory file data is in mm
 
@@ -885,7 +887,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'n002':2, 'n005':5, 'n010':10, 'n020':20, 'n050':50, 'n100':100, 'n200':200,\
                 'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200,\
                 'q002':2, 'q005':5, 'q010':10, 'q020':20, 'q050':50, 'q100':100, 'q200':200,\
-                'r002':2, 'r005':5, 'r010':10, 'r020':20, 'r050':50, 'r100':100, 'r200':200}[file_ext]
+                'r002':2, 'r005':5, 'r010':10, 'r020':20, 'r050':50, 'r100':100, 'r200':200,\
+                'y901':0.1,'y905':0.5, 'y001':1,'y002':2, 'y005':5, 'y010':10, 'y025':25, 'y050':50, 'y100':100, 'y250':250}[file_ext]
 
     num = 0 #number of simulated particles
     for i in range(len(f)):
@@ -922,7 +925,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
             #finals = np.append(finals, np.array([x, y, z, vx, vy, vz, tim, r, theta]),axis=0)
             finals[j] = np.array([x, y, z, vx, vy, vz, tim, r, theta])
             j += 1
-
+    
+    
     found = False
     for i in range(len(f)):
         #If still looking and z coordinate is past the query boundary pos
@@ -1002,15 +1006,16 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         zs = finals[:, 2] / 1000.
         colour = plt.cm.Greens(100)
         plt.plot(zs, np.sqrt(xs**2+ys**2), '+', c=colour, ms=13)
-        plt.vlines(0.001, 0, 0.0015875, colors='gray', linewidths=.5)
-        plt.hlines(0.0015875, 0.001, 0.015, colors='gray', linewidths=.5)
-        plt.vlines(0.015, 0.0015875, 0.00635, colors='gray', linewidths=.5)
-        plt.hlines(0.00635, 0.015, 0.0635, colors='gray', linewidths=.5)
-        plt.vlines(0.0635, 0.00635, 0.0025, colors='gray', linewidths=.5)
-        plt.hlines(0.0025, 0.0635, 0.064, colors='gray', linewidths=.5)
-        plt.vlines(0.064, 0.0025, 0.009, colors='gray', linewidths=.5)
-        plt.hlines(0.009, 0, 0.064, colors='gray', linewidths=.5)
+        plt.vlines(0.001, 0, 0.0010583, colors='gray', linewidths=.5)
+        plt.hlines(0.0010583, 0.001, 0.015, colors='gray', linewidths=.5)
+        plt.vlines(0.015, 0.0010583, 0.00635, colors='gray', linewidths=.5)
+        plt.hlines(0.00635, 0.015, 0.0531, colors='gray', linewidths=.5)
+        plt.vlines(0.0531, 0.00635, 0.0025, colors='gray', linewidths=.5)
+        plt.hlines(0.0025, 0.0531, 0.0536, colors='gray', linewidths=.5)
+        plt.vlines(0.0536, 0.0025, 0.009, colors='gray', linewidths=.5)
+        plt.hlines(0.009, 0, 0.0536, colors='gray', linewidths=.5)
         plt.xlim(0, pos0+0.01)
+        #plt.xlim(0, pos0+0.01)
         plt.show()
         plt.clf()
 
@@ -1068,7 +1073,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     if rad_mode == True:
         dep_title = " at r = {0} m".format(dome_rad0)
     else:
-        dep_title = " 3 cm from aperture".format(pos0)
+        dep_title = " {0} cm from aperture".format(100*(pos0-DEFAULT_APERTURE))
 
     dep_title_flow = dep_title + "\nFlowrate = {0} SCCM, straight hole".format(flowrate)
 
@@ -1111,17 +1116,19 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
         plt.plot(vrs, vzs, '.')
         plt.title("Velocity Distribution" + dep_title_flow)
-        plt.ylabel('Axial velocity (m/s)')
+        plt.ylabel('Forward velocity (m/s)')
         plt.xlabel('Radial velocity (m/s)')
         plt.tight_layout()
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/vel_scatter.png")
         plt.show()
 #        plt.savefig('images/'+file_ext+'Vel%g.png'%pos)
         plt.clf()
+        
+        mean_forvelo = np.mean(vzs)
 
-        plt.title("Axial Velocity Distribution" + dep_title_flow)
-        plt.hist(vzs, bins=20, range=[0,130])
-        plt.xlabel('Axial velocity (m/s)')
+        plt.title("Forward Velocity Distribution" + dep_title_flow)
+        plt.hist(vzs, bins=20, range=[0,130], label='Beam mean forward velocity: {} mm'.format(round(mean_forvelo,3)))
+        plt.xlabel('Forward velocity (m/s)')
         plt.ylabel('Frequency')
 #        plt.savefig("/Users/gabri/Desktop/HutzlerSims/Plots/"+file_ext+"/Dome/axial_vel.png")
         plt.show()
@@ -1191,6 +1198,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
           %(np.mean(thetas), np.std(thetas)))
     print('Pumpout time dist' + dep_title+ ': %.1f +- %.1f ms \n'\
           %(np.mean(times), np.std(times)))
+    print('Beam mean forward velocity: {} m/s'.format(round(mean_forvelo,3)))
 
     # return flowrate, dome_rad, vradMean, vradSD, axMean, axSD, spread, thetMean, thetSD, tMean, tSD
 
