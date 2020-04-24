@@ -39,7 +39,7 @@ M_S = .190061 / NA # Species mass (kg)
 M_RED = (M_HE * M_S) / (M_HE + M_S)
 MASS_PARAM = 2 * M_HE / (M_HE + M_S)
 #CROSS_YBF = 20 * 4 * np.pi * (140 * 10**(-12))**2 # helium-helium cross section
-CROSS_YBF = 100*10**(-20) #YbF-He cross section at 20 K (m^2) 
+CROSS_YBF = 5*100*10**(-20) #YbF-He cross section at 20 K (m^2) 
 # YbOH mass in amu
 mass = 173 + 16 + 1  
 # buffer gass mass (He) in amu
@@ -474,6 +474,17 @@ class ParticleTracing_Yuiki(object):
         # Return the list of random (direction & length) points.
         return radius/3 * (random_directions * random_radii).T
 
+    def random_ball2(self, radius):
+
+        # generate random directions by normalizing the length of a vector of random-normal values
+        random_directions = random.normal(size=(3, 1))
+        random_directions /= linalg.norm(random_directions, axis=0)
+
+        # uniform distribution over the radius.
+        random_radii = uniform.rvs(0,1)
+        
+        # Return the list of random (direction & length) points.
+        return radius * (random_directions * random_radii).T
 
     def initial_species_position(self):
         '''
@@ -484,7 +495,8 @@ class ParticleTracing_Yuiki(object):
         * INIT_COND 2: 5000K ablation
         * INIT_COND 9: Full cell F
         * INIT_COND 11: Full cell H
-        * INIT_COND 12: 1 cm diamter ball (the center is z = 0.064 m)
+        * INIT_COND 12: 1 cm diamter gaussian ball (the center is z = 0.064 m)
+        * INIT_COND 13: 1 cm diamter uniform ball (the center is z = 0.064 m)
         '''
         #Retrieve which pre-specified type of initial conditions
         #were chosen for this simulation
@@ -526,11 +538,25 @@ class ParticleTracing_Yuiki(object):
             x, y = -0.00635+0.0001, 0
             z = np.random.uniform(0.035,0.040)
         
-        # 1 cm (= 0.01 m) diamter uniform ball (the center of the ball is z = 0.064 m)
+        # 1 cm (= 0.01 m) diamter gasussian ball (the center of the ball is z = 0.064 m)
         elif mode==12:
             r = self.random_ball(0.005)
             x, y, znew = r[0]
             z = znew + 0.064
+            
+        # 1 cm (= 0.01 m) diamter uniform ball (the center of the ball is z = 0.064 m)    
+        elif mode==13:
+            r = self.random_ball2(0.005)
+            x, y, znew = r[0]
+            z = znew + 0.064
+            
+        # uniformly distributed over the t cell    
+        elif mode==14:
+            r = np.random.uniform(0,0.00635)
+            ang = np.random.uniform(0, 2*np.pi)
+            x, y = r * np.cos(ang), r * np.sin(ang)
+            z = np.random.uniform(0.035,0.0881)
+            
             
         else:
             raise ValueError('Did not recognize INIT_COND {}'.format(mode))
@@ -552,7 +578,7 @@ class ParticleTracing_Yuiki(object):
         # global T_s
         init_cond = self._INIT_COND
         #These initial conditions assume the molecules begin thermalized with the 4K environment
-        if init_cond in [0, 1, 9, 11, 12]:
+        if init_cond in [0, 1, 9, 11, 12, 13, 14]:
             T_s = 4.0 #species temperature: assume 4K thermalization
 
             Vx = self.particle_generator(prop='Mol_Thermal_Vel', T=T_s)
@@ -798,11 +824,15 @@ def get_flow_chars(filename):
     '''
 
     #e.g. filename = flows/G_Cell/DS2g020
-    if filename[13:16] == "DS2":
+    if filename[13:16] == "DS2" and (not filename[16] in ['t']):
         geometry = {'f':"fCell", 'g':"gCell", 'h':"hCell", 'j':"jCell",\
                     'k':"kCell", 'm':"mCell", 'n':"nCell", 'p':"pCell",\
-                    'q':"qCell", 'r':"rCell", 'y':"yCell", 't':"tCell"}[filename[16]]
+                    'q':"qCell", 'r':"rCell", 'y':"yCell"}[filename[16]]
         flowrate = int(filename[17:20])
+        
+    elif filename[13:16] == "DS2" and (filename[16] in ['t']):
+        geometry = 'tCell'
+        flowrate = 1
 
     else:
         raise ValueError('Could not recognize the DS2 flow file')

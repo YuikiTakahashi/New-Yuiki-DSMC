@@ -833,7 +833,7 @@ def Integrand(x,z, fVz1, fDens1):
 
 
 
-def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False):
+def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False, radial_size=False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -954,8 +954,15 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
                 'p002':2, 'p005':5, 'p010':10, 'p020':20, 'p050':50, 'p100':100, 'p200':200,\
                 'q002':2, 'q005':5, 'q010':10, 'q020':20, 'q050':50, 'q100':100, 'q200':200,\
                 'r002':2, 'r005':5, 'r010':10, 'r020':20, 'r050':50, 'r100':100, 'r200':200,\
-                't901':0.1,'t905':0.5, 't001':1,'t002':2, 't005':5, 't010':10, 't020':20, 't050':50, 't100':100, 't200':200,\
-                'y901':0.1,'y905':0.5, 'y001':1,'y002':2, 'y005':5, 'y010':10, 'y025':25, 'y050':50, 'y100':100, 'y250':250}[file_ext]
+                'thalfv25nsigma5':1,'tv10nsigma5':1,'tquarterv50nsigma5':1,\
+                'tv2nsigma5':1,'tv3nsigma5':1,'tv2n5sigma':1,'tv3n5sigma':1,\
+                'tvnsigma5':1, 'thalfv10nsigma5':1,'tv5nsigma5':1,'tv2n':1,'tv3n':1,\
+                'tvn5sigma':1, 'thalfv10n5sigma':1,'tv5n5sigma':1, 'tv10n':1,\
+                'thalfv10n':1,'thalfv25n':1, 'tquarterv50n':1,'tv10n':2,\
+                't901':0.1,'t905':0.5, 't001':1,'t002':2, 't005':5, 't010':10,\
+                't020':20, 't050':50, 't100':100, 't200':200,\
+                'y901':0.1,'y905':0.5, 'y001':1,'y002':2, 'y005':5, 'y010':10,\
+                'y025':25, 'y050':50, 'y100':100, 'y250':250}[file_ext]
     
     # FYI, this part is explicitly integrating the He flux at the aperture of the inlet and calculate the SCCM value for t geometry, which is created by Yuiki in 2020
     if file_ext[0] in ['t']:
@@ -998,7 +1005,8 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 
 
     print("Number of particles: {}".format(num))
-    finals = np.zeros((num, 9))
+    finals = np.zeros((num,9))
+    radialsize = np.zeros((9,3))
     #finals = np.zeros((1,9))
     j = 0
     for i in range(len(f)):
@@ -1030,12 +1038,22 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
             y += vy * delta_t
             tim += delta_t
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
-            theta = (180/np.pi) * np.arccos((z-z_center)/r)
+            theta = (180/np.pi) * np.arccos((z-z_center)/r) 
+            
 
             if debug:
                 print("Writing to debug file on j={}, file row {}, block {}".format(j, i-1, 'B'))
                 #debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
 
+            if radial_size == True:
+                x1, y1, z1, vx1, vy1, vz1, tim1 = f[i-1]
+                for interval in range(9):
+                    t_interval = (pos-z_center+(5*interval))/vz1
+                    x1 += vx1 * t_interval
+                    y1 += vy1 * t_interval
+                    radialsize[interval] = np.array([x1, y1, pos-z_center+(5*interval)])
+                
+                
             finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
             #finals = np.append(finals, np.array([x, y, pos, vx, vy, vz, tim, r, theta]),axis=0)
 
@@ -1162,6 +1180,10 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     print('Median radius {0} mm, median theta {1} deg'.format(round(1000*median_radius,3), round(median_theta,3)) )
     print('{} were useful ({}%)'.format(numUseful,round(100*numUseful/num,3)))
     fit_velocity_dist(vzs, vrs)
+    
+    #beam divergence
+    spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
+    print('beam divergence (degree): ', spreadB)
 
     #Title dependent on whether we analyze plane or dome, and flowrate of DSMC
     if rad_mode == True:
@@ -1195,6 +1217,25 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         plt.show()
 #        plt.savefig('images/'+file_ext+'Pos%g.png')%pos
         plt.clf()
+        
+        if radial_size == True:
+            
+            for interval in range(9):
+            
+                rs1 = np.sqrt(radialsize[interval,0]**2+radialsize[interval,1]**2)
+                median_radius = np.median(rs1) #radius of cylinder containing 50% of the particles
+                plt.plot(100*radialsize[interval,0], 100*radialsize[interval,1], '.', zorder=1)
+                circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, \
+                                  zorder=2, label='Beam median radius: {} mm'.format(round(1000*median_radius,3)))
+                ax.add_patch(circ)
+                plt.xlim(-3.5,3.5)
+                plt.ylim(-2.5,2.5)
+                plt.xlabel('x (cm)')
+                plt.ylabel('y (cm)')
+                plt.title("Radial scatter at " + str(radialsize[interval,2]) + " mm from the aperture" )
+                plt.legend()
+                plt.show()
+                plt.clf()
 
 
 
@@ -1261,13 +1302,12 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
         plt.clf()
 
 
-    stdArrived = np.sqrt(float(numArrived)*(num-numArrived)/num)/num
+    stdArrived = np.sqrt(float(numArrived)*(num-numArrived)/num)/num 
     spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
-    spreadB = 180/np.pi * 2 * np.arctan(np.std(vrs)/np.mean(vzs))
     gamma = cross * flowrate * sccmSI / (0.05 * vMean)
-
     #Estimating d_aperture = 0.0025
     reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
+                                           
 
     if rad_mode == False:
         print('\nAnalysis of data for z = %g m, equal to %g m past the aperture:'%(pos0, pos0-DEFAULT_APERTURE))
@@ -1307,7 +1347,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     if write == 1 and rad_mode==True:
         with open(directory+folder+'/'+write_file, 'a') as tc:
             tc.write('  '.join(map(str, [dome_rad0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
-                     round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
+                     round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.median(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
                      round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3)] ))+'\n')
 
@@ -1316,11 +1356,10 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
     #These two are identical except for reporting the dome radius (dome_rad0) versus the plane distance (pos0)
     elif write == 1 and rad_mode==False:
         with open(directory+folder+'/'+write_file, 'a') as tc:
-            tc.write('  '.join(map(str, [pos0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
-                     round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.mean(vzs),3),\
-                     round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
-                     round(np.mean(times),3), round(np.std(times),3), round(reynolds,2), round(spreadB,3), round(1000*median_radius,3),\
-                     ] ))+'\n')
+            tc.write(str(round(float(pos0),3))+'  '+str( round(float(flowrate),2))+'  '+str( round(gamma,3))+'  '+str( round(float(numArrived)/num,3))+'  '+str(\
+                     round(stdArrived,3))+'  '+str( round(np.mean(vrs),3))+'  '+str( round(np.std(vrs),3))+'  '+str( round(np.medean(vzs),3))+'  '+str(\
+                     round(np.std(vzs),3))+'  '+str( round(spread,3))+'  '+str( round(np.mean(thetas),3))+'  '+str( round(np.std(thetas),3))+'  '+str(\
+                     round(np.mean(times),3))+'  '+str( round(np.std(times),3))+'  '+str( round(reynolds,2))+'  '+str( round(spreadB,3))+'  '+str( round(1000*median_radius,3))+'\n')
 
         tc.close()
 
@@ -1329,7 +1368,7 @@ def analyzeTrajData(file_ext, folder, write_file=None, pos=0.064, write=False, p
 # best to keep each data file with the same plane position i.e. keep only a single
 # value for the zs
 # =============================================================================
-def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, windowMode=False, header=True):
+def multiFlowAnalyzePlane(folder,  write_file='summary_inicon13.dat', plane=0.064, write=True, plot=True, windowMode=False, header=False, geom='t', fileList = ['t002', 't010','tv2n','tv3n', 'tv10n','thalfv10n','thalfv25n', 'tquarterv50n']):
     '''
     Iterate through each of the flowrates, for a given geometry, and either write
     the output from analyzeTrajData to a file, or plot the analysis from the file,
@@ -1338,26 +1377,27 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
     #fileList = ['f17_lite', 'f18_lite', 'f19_lite', 'f20_lite', 'f21_lite', 'f22_lite', 'f23_lite']
     #fileList = ['f21', 'f17', 'f20', 'f18', 'f19', 'f22', 'f23']
 
-    geom='r'
-    fileList = ['002', '005', '010', '020', '050','200']
+    
+    
 
 #    folder = 'InitLarge'
+           
 
     if write==True:
 
         if header:
-            with open('/Users/Yuiki Takahashi/Dropbox (Hutzler Lab)/HutzlerLabShared/Personal/Yuiki Takahashi/Yuiki DSMC codes/MD codes/New-Yuiki-DSMC/3Dsim/Data/{}'.format(folder+'/'+file), 'a+') as tc:
+            with open('Data/{}'.format(folder+'/'+ write_file), 'a+') as tc:
                 tc.write("PlaneZ FR   Gamma  Ext    sigE   vR     sigvR vZ      sigvZ   Sprd    theta   sigTh time   sigT   Reyn  SprdB   MedRad(mm)\n")
             tc.close()
 
         for f in fileList:
-            analyzeTrajData(geom+f, folder, file, pos=plane, window=windowMode, write=True, rad_mode=False)
+            analyzeTrajData(f, folder,  write_file, pos=plane, window=False, write=1,plots=True, rad_mode=False)
 
 
     if plot == True:
 
-        directory = '/Users/Yuiki Takahashi/Dropbox (Hutzler Lab)/HutzlerLabShared/Personal/Yuiki Takahashi/Yuiki DSMC codes/MD codes/New-Yuiki-DSMC/3Dsim/Data/'
-        f = np.loadtxt(directory+folder+'/'+file, skiprows=1)
+        directory = 'Data/'
+        f = np.loadtxt(directory+folder+'/'+write_file, skiprows=1)
 
         zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
         thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
@@ -1373,40 +1413,34 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
         plt.show()
         plt.clf()
 
-        plt.title("Angular Spread vs Flowrate")
-        plt.errorbar(x=frs, y=spreads, fmt='ro')
+        #plt.title("Angular Spread vs Flowrate")
+        #plt.errorbar(x=frs, y=spreads, fmt='ro')
+        #plt.xlabel("Flowrate (SCCM)")
+        #plt.ylabel("Arrival time at z={} m".format(plane))
+        #plt.show()
+        #plt.clf()
+
+        plt.title("Extraction Rate vs flowrate")
+        plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
         plt.xlabel("Flowrate (SCCM)")
-        plt.ylabel("Arrival time at z={} m".format(plane))
+        plt.ylabel("Fraction Extracted")
         plt.show()
         plt.clf()
 
-        plt.title("Extraction Rate vs Gamma")
-        plt.errorbar(x=gammas, y=ext, yerr=sigE,fmt='ro')
-        plt.xlabel("Gamma")
-        plt.ylabel("Fraction Extracted".format(plane))
-        plt.show()
-        plt.clf()
-
-        plt.title("Forward Velocity vs Reynolds Number")
-        plt.errorbar(x=reyn, y=vz, yerr=vzSig, fmt='ro')
-        plt.xlabel("Reynolds Number")
+        plt.title("Forward Velocity vs Flowrate (SCCM)r")
+        plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='ro')
+        plt.xlabel("Flowrate (SCCM)")
         plt.ylabel("Forward Velocity (m/s)")
         plt.show()
         plt.clf()
 
-        plt.title("Forward Velocity FWHM vs Reynolds Number")
-        plt.errorbar(x=reyn, y=vzSig, fmt='ro')
-        plt.xlabel("Reynolds Number")
-        plt.ylabel("Forward Velocity St. Dev.")
-        plt.show()
-        plt.clf()
-
-        plt.title("Forward Velocity FWHM vs Flowrate")
+        plt.title("Forward Velocity FWHM vs Flowrate (SCCM)")
         plt.errorbar(x=frs, y=vzSig, fmt='ro')
         plt.xlabel("Flowrate (SCCM)")
         plt.ylabel("Forward Velocity St. Dev.")
         plt.show()
         plt.clf()
+
 
         plt.title("Reynolds Number vs Flowrate")
         plt.errorbar(x=frs, y=reyn, fmt='ro')
@@ -1429,10 +1463,10 @@ def multiFlowAnalyzePlane(file, folder, plane=0.064, write=False, plot=False, wi
         plt.show()
         plt.clf()
 
-        plt.title("OTHER Angular Spread vs Reynolds Number")
-        plt.errorbar(x=reyn, y=spreadB, fmt='ro')
-        plt.xlabel("Reynolds Number")
-        plt.ylabel("Calculated Spread B")
+        plt.title("Beam divergence vs flowrate SCCM")
+        plt.errorbar(x=frs, y=spreadB, fmt='ro')
+        plt.xlabel("flowrate (SCCM)")
+        plt.ylabel("Beam divergence (degree)")
         plt.show()
         plt.clf()
 
