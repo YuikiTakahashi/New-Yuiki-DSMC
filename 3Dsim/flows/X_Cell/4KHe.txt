@@ -1,0 +1,4 @@
+This is 4K He flowfield data
+re-ran Xcell old DS2V with some tweaks.  "Y geometry w tube - He4K -NRH-20200519"
+In addition to changing the geometry to eliminate regions with no flow (therefore reducing the computational space) I adjusted the cell sizes
+so that it would converge faster.

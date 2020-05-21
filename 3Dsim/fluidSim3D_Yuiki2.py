@@ -7,7 +7,7 @@ Created on Wed Jun 20 15:43:30 2018
 
 @author: Dave
 """
-
+import matplotlib.backends.backend_pdf
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
@@ -35,7 +35,8 @@ m = 0.004 / NA # Ambient gas mass (kg)
 M = .190061 / NA # Species mass (kg)
 massParam = 2 * m / (m + M)
 n = 10**21 # m^-3
-crossBB = 4 * np.pi * (140 * 10**(-12))**2 # two-helium cross sectional area
+crossBB = 1.44 * 10**(-18) # two-helium cross sectional area in meters-squared - updated by Yuiki in 2020 May
+aperture_diameter = 0.0025 # aperture diameter in meter, used for converting sccm to reynolds number
 cross = 4*crossBB # Rough estimate of He-YbOH cross sectional area
 cross *= 5 # Manual
 
@@ -833,7 +834,7 @@ def Integrand(x,z, fVz1, fDens1):
 
 
 
-def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False, radial_size=False):
+def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=False,rad_mode=False, dome_rad=0.02,debug=False,window=False, radial_size=False, summaryfolder = 'summary',HEATMAP = False):
     '''
     Running a Parallel open trajectory script produces a file with six columns;
     three each for positions and velocities.
@@ -1006,10 +1007,10 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
 
     print("Number of particles: {}".format(num))
     finals = np.zeros((num,9))
-    radialsize = np.zeros((9,3))
     #finals = np.zeros((1,9))
     j = 0
     for i in range(len(f)):
+        # Yuiki understanding; looking for molecules which hit the wall of the cell and thus didn't make it to the outside of the cell
         if (not np.any(f[i])) and f[i-1][2] != DEFAULT_ENDPOS and np.sqrt(f[i-1][0]**2 + f[i-1][1]**2) < 30:
             #Finds final row of data for adequate particles. Not condensed, but those that
             #went past aperture. Maybe condensed in vacuum chamber?
@@ -1027,31 +1028,28 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
             j += 1
     
     
+    exitnum = 0
     found = False
     for i in range(len(f)):
+        
+        # Yuiki understanding; looking for molecules which passed the pos (and thus exited the aperture)
         #If still looking and z coordinate is past the query boundary pos
         if found == False and f[i][2] > pos and rad_mode == False:
             #Linearly backtrack to boundary at pos
             x, y, z, vx, vy, vz, tim = f[i-1]
-            delta_t = (pos-z)/vz #Negative value
+            delta_t = (pos-z)/vz #Negative value # Yuiki understanding; positive value?
             x += vx * delta_t
             y += vy * delta_t
             tim += delta_t
             r = np.sqrt((x_center-x)**2+(y_center-y)**2+(z_center-z)**2)
             theta = (180/np.pi) * np.arccos((z-z_center)/r) 
             
+            exitnum += 1
+            
 
             if debug:
                 print("Writing to debug file on j={}, file row {}, block {}".format(j, i-1, 'B'))
                 #debugf.write(' '.join(map(str, [i-1, round(x,3), round(y,3), pos, round(tim,4), j] ) )+' 02\n')
-
-            if radial_size == True:
-                x1, y1, z1, vx1, vy1, vz1, tim1 = f[i-1]
-                for interval in range(9):
-                    t_interval = (pos-z_center+(5*interval))/vz1
-                    x1 += vx1 * t_interval
-                    y1 += vy1 * t_interval
-                    radialsize[interval] = np.array([x1, y1, pos-z_center+(5*interval)])
                 
                 
             finals[j] = np.array([x, y, pos, vx, vy, vz, tim, r, theta])
@@ -1103,15 +1101,41 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
                 j += 1
                 found = True
 
+        # Yuiki understanding; reset the 'found' because we finish analyzing the particle that we found above (and thus passed the pos)
         elif not np.any(f[i]):
             found = False
 
     if debug:
         print("Got to close")
         debugf.close()
+        
+    if radial_size == True:
+        
+        found = False       
+        radialsize = np.zeros((9, exitnum,4))
+        for k1 in range(9):
+            jj = 0
+            position = k1*5 + z_center
+            
+            for k2 in range(len(f)):
+
+                if found == False and f[k2][2] > position:
+                    #Linearly backtrack to boundary at pos
+                    x1, y1, z1, vx1, vy1, vz1, tim1 = f[k2-1]
+                
+                    t_interval = (position-z_center)/vz1
+                    x1 += vx1 * t_interval
+                    y1 += vy1 * t_interval
+                    r1 = np.sqrt(x1**2+y1**2)
+                    radialsize[k1][jj] = np.array([x1/1000, y1/1000, position-z_center, r1])
+                    jj += 1
+                    found = True
+                    
+                elif not np.any(f[k2]):
+                    found = False
 
     if plots == True:
-        
+
         #modify this part - this part is drawing the cell geometry by hand, but we can certainly modify this part to automatically loading the geometry - by Yuiki 
         xs = finals[:, 0] / 1000.
         ys = finals[:, 1] / 1000.
@@ -1220,24 +1244,38 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
         
         if radial_size == True:
             
-            for interval in range(9):
+            median_radius1 = np.zeros((2,9))
+            #fig, ax = plt.subplots(9,1,figsize=(10,20), constrained_layout=True)
             
-                rs1 = np.sqrt(radialsize[interval,0]**2+radialsize[interval,1]**2)
-                median_radius = np.median(rs1) #radius of cylinder containing 50% of the particles
-                plt.plot(100*radialsize[interval,0], 100*radialsize[interval,1], '.', zorder=1)
-                circ = plt.Circle((0,0), 100*median_radius, color='red', fill=0, lw=2, \
-                                  zorder=2, label='Beam median radius: {} mm'.format(round(1000*median_radius,3)))
-                ax.add_patch(circ)
+            for k3 in range(9):
+                
+                plt.figure(k3+1)
+                #rs1 = np.sqrt(radialsize[k3,:,0]**2+radialsize[k3,:,1]**2)
+                #ax[k3].axis('equal')
+                #print(k3,radialsize[k3,:,3],np.median(radialsize[k3,:,3]))
+                median_radius1[1,k3] = np.median(radialsize[k3,:,3])#radius of cylinder containing 50% of the particles
+                median_radius1[0,k3] = radialsize[k3,0,2]
+                
+                plt.plot(100*radialsize[k3,:,0], 100*radialsize[k3,:,1], '.', zorder=1)
+                #plt.Circle((0,0), median_radius1/10, color='red', fill=0, lw=2, \
+                                  #zorder=2, label='Beam median radius: {} mm'.format(round(median_radius1,3)))
+                #ax.add_patch(circ)
                 plt.xlim(-3.5,3.5)
                 plt.ylim(-2.5,2.5)
                 plt.xlabel('x (cm)')
                 plt.ylabel('y (cm)')
-                plt.title("Radial scatter at " + str(radialsize[interval,2]) + " mm from the aperture" )
-                plt.legend()
+                plt.title("Radial scatter at " + str(radialsize[k3,0,2]) + " mm from the aperture" )
+                #plt.legend()
                 plt.show()
                 plt.clf()
-
-
+            #print(median_radius1[0], median_radius1[1],median_radius1[1,:])
+                
+            plt.title("Distance vs Median Radius")
+            plt.errorbar(x=median_radius1[0], y=median_radius1[1], fmt='ro')
+            plt.xlabel("Distance (mm)")
+            plt.ylabel("Median Radius (mm)")
+            plt.show()
+            plt.clf()
 
 #        plt.title("Radial Distribution" + dep_title_flow)
 #        #plt.title("Radial Distribution at r = %g m"%dome_rad)
@@ -1306,7 +1344,7 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
     spread = 180/np.pi * 2 * np.arctan(np.mean(vrs)/np.mean(vzs))
     gamma = cross * flowrate * sccmSI / (0.05 * vMean)
     #Estimating d_aperture = 0.0025
-    reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (0.0025 * vMean)
+    reynolds = 8.0*np.sqrt(2.0) * crossBB * flowrate* sccmSI / (aperture_diameter * vMean)
                                            
 
     if rad_mode == False:
@@ -1345,7 +1383,7 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
     #     tc.close()
 
     if write == 1 and rad_mode==True:
-        with open(directory+folder+'/'+write_file, 'a') as tc:
+        with open(directory+summaryfolder+'/'+write_file, 'a') as tc:
             tc.write('  '.join(map(str, [dome_rad0, round(float(flowrate),2), round(gamma,3), round(float(numArrived)/num,3),\
                      round(stdArrived,3), round(np.mean(vrs),3), round(np.std(vrs),3), round(np.median(vzs),3),\
                      round(np.std(vzs),3), round(spread,3), round(np.mean(thetas),3), round(np.std(thetas),3),\
@@ -1355,9 +1393,9 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
 
     #These two are identical except for reporting the dome radius (dome_rad0) versus the plane distance (pos0)
     elif write == 1 and rad_mode==False:
-        with open(directory+folder+'/'+write_file, 'a') as tc:
+        with open(directory+summaryfolder+'/'+write_file, 'a') as tc:
             tc.write(str(round(float(pos0),3))+'  '+str( round(float(flowrate),2))+'  '+str( round(gamma,3))+'  '+str( round(float(numArrived)/num,3))+'  '+str(\
-                     round(stdArrived,3))+'  '+str( round(np.mean(vrs),3))+'  '+str( round(np.std(vrs),3))+'  '+str( round(np.medean(vzs),3))+'  '+str(\
+                     round(stdArrived,3))+'  '+str( round(np.mean(vrs),3))+'  '+str( round(np.std(vrs),3))+'  '+str( round(np.median(vzs),3))+'  '+str(\
                      round(np.std(vzs),3))+'  '+str( round(spread,3))+'  '+str( round(np.mean(thetas),3))+'  '+str( round(np.std(thetas),3))+'  '+str(\
                      round(np.mean(times),3))+'  '+str( round(np.std(times),3))+'  '+str( round(reynolds,2))+'  '+str( round(spreadB,3))+'  '+str( round(1000*median_radius,3))+'\n')
 
@@ -1368,7 +1406,7 @@ def analyzeTrajData(file_ext, folder, write_file, pos=0.064, write=False, plots=
 # best to keep each data file with the same plane position i.e. keep only a single
 # value for the zs
 # =============================================================================
-def multiFlowAnalyzePlane(folder,  write_file='summary_inicon13.dat', plane=0.064, write=True, plot=True, windowMode=False, header=False, geom='t', fileList = ['t002', 't010','tv2n','tv3n', 'tv10n','thalfv10n','thalfv25n', 'tquarterv50n']):
+def multiFlowAnalyzePlane(folder,write_file='summary_inicon13.dat', plane=0.064, write=True, plot=True, windowMode=False, header=False, geom='t', fileList = ['t002', 't010','tv2n','tv3n', 'tv10n','thalfv10n','thalfv25n', 'tquarterv50n'], overlap = False, summaryfolder = 'summary', overlap_filelist = ['summary_inicon12.dat', 'summary_inicon13.dat', 'summary_inicon14.dat'], legendlist = ['gaussian Φ1cm ball', 'uniform Φ1cm ball', 'uniform t cell']):
     '''
     Iterate through each of the flowrates, for a given geometry, and either write
     the output from analyzeTrajData to a file, or plot the analysis from the file,
@@ -1381,7 +1419,8 @@ def multiFlowAnalyzePlane(folder,  write_file='summary_inicon13.dat', plane=0.06
     
 
 #    folder = 'InitLarge'
-           
+    
+    print('If the "write" mode is True, then "overlap" mode should be Flase and vice versa!')
 
     if write==True:
 
@@ -1395,80 +1434,185 @@ def multiFlowAnalyzePlane(folder,  write_file='summary_inicon13.dat', plane=0.06
 
 
     if plot == True:
+        
+        if overlap == False:
 
-        directory = 'Data/'
-        f = np.loadtxt(directory+folder+'/'+write_file, skiprows=1)
+            directory = 'Data/'
+            f = np.loadtxt(directory+summaryfolder+'/'+write_file, skiprows=1)
 
-        zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
-        thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
-        f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
-        f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15], f[:,16]
+            zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+            thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
+            f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+            f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15], f[:,16]
 
-        print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
+            #print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
 
-        plt.title("Pumpout Time vs Flowrate")
-        plt.errorbar(x=frs, y=times, yerr=timeSig, fmt='ro')
-        plt.xlabel("Flowrate (SCCM)")
-        plt.ylabel("Arrival time at z={} m".format(plane))
-        plt.show()
-        plt.clf()
+            plt.title("Pumpout Time vs Flowrate")
+            plt.errorbar(x=frs, y=times, yerr=timeSig, fmt='ro')
+            plt.xlabel("Flowrate (SCCM)")
+            plt.ylabel("Arrival time at z={} m".format(plane))
+            plt.show()
+            plt.clf()
 
-        #plt.title("Angular Spread vs Flowrate")
-        #plt.errorbar(x=frs, y=spreads, fmt='ro')
-        #plt.xlabel("Flowrate (SCCM)")
-        #plt.ylabel("Arrival time at z={} m".format(plane))
-        #plt.show()
-        #plt.clf()
+            #plt.title("Angular Spread vs Flowrate")
+            #plt.errorbar(x=frs, y=spreads, fmt='ro')
+            #plt.xlabel("Flowrate (SCCM)")
+            #plt.ylabel("Arrival time at z={} m".format(plane))
+            #plt.show()
+            #plt.clf()
 
-        plt.title("Extraction Rate vs flowrate")
-        plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
-        plt.xlabel("Flowrate (SCCM)")
-        plt.ylabel("Fraction Extracted")
-        plt.show()
-        plt.clf()
+            plt.title("Extraction Rate vs flowrate")
+            plt.errorbar(x=frs, y=ext, yerr=sigE,fmt='ro')
+            plt.xlabel("Flowrate (SCCM)")
+            plt.ylabel("Fraction Extracted")
+            plt.show()
+            plt.clf()
 
-        plt.title("Forward Velocity vs Flowrate (SCCM)r")
-        plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='ro')
-        plt.xlabel("Flowrate (SCCM)")
-        plt.ylabel("Forward Velocity (m/s)")
-        plt.show()
-        plt.clf()
+            plt.title("Median Forward Velocity vs Flowrate (SCCM)")
+            plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt='ro')
+            plt.xlabel("Flowrate (SCCM)")
+            plt.ylabel("Median Forward Velocity (m/s)")
+            plt.show()
+            plt.clf()
 
-        plt.title("Forward Velocity FWHM vs Flowrate (SCCM)")
-        plt.errorbar(x=frs, y=vzSig, fmt='ro')
-        plt.xlabel("Flowrate (SCCM)")
-        plt.ylabel("Forward Velocity St. Dev.")
-        plt.show()
-        plt.clf()
+            plt.title("Forward Velocity FWHM vs Flowrate (SCCM)")
+            plt.errorbar(x=frs, y=vzSig, fmt='ro')
+            plt.xlabel("Flowrate (SCCM)")
+            plt.ylabel("Forward Velocity St. Dev.")
+            plt.show()
+            plt.clf()
 
 
-        plt.title("Reynolds Number vs Flowrate")
-        plt.errorbar(x=frs, y=reyn, fmt='ro')
-        plt.ylabel("Reynolds Number")
-        plt.xlabel("Flowrate (SCCM)")
-        plt.show()
-        plt.clf()
+            plt.title("Reynolds Number vs Flowrate")
+            plt.errorbar(x=frs, y=reyn, fmt='ro')
+            plt.ylabel("Reynolds Number")
+            plt.xlabel("Flowrate (SCCM)")
+            plt.show()
+            plt.clf()
 
-        plt.title("Angular Spread vs Reynolds Number")
-        plt.errorbar(x=reyn, y=spreads, fmt='ro')
-        plt.xlabel("Reynolds Number")
-        plt.ylabel("Calculated Spread")
-        plt.show()
-        plt.clf()
+            plt.title("Median Forward Velocity vs Reynolds Number")
+            plt.errorbar(x=reyn, y=vz, fmt='ro')
+            plt.xlabel("Reynolds Number")
+            plt.ylabel("Median Forward Velocity")
+            plt.show()
+            plt.clf()
 
-        plt.title("Theta Std. Dev. vs Reynolds Number")
-        plt.errorbar(x=reyn, y=thetaSig, fmt='ro')
-        plt.xlabel("Reynolds Number")
-        plt.ylabel("Theta Stand. Dev.")
-        plt.show()
-        plt.clf()
+            plt.title("Extraction Rate vs Reynolds Number")
+            plt.errorbar(x=reyn, y=ext, yerr=sigE, fmt='ro')
+            plt.xlabel("Reynolds Number")
+            plt.ylabel("Extraction Rate")
+            plt.show()
+            plt.clf()
 
-        plt.title("Beam divergence vs flowrate SCCM")
-        plt.errorbar(x=frs, y=spreadB, fmt='ro')
-        plt.xlabel("flowrate (SCCM)")
-        plt.ylabel("Beam divergence (degree)")
-        plt.show()
-        plt.clf()
+            plt.title("Beam divergence vs flowrate SCCM")
+            plt.errorbar(x=frs, y=spreadB, fmt='ro')
+            plt.xlabel("flowrate (SCCM)")
+            plt.ylabel("Beam divergence (degree)")
+            plt.show()
+            plt.clf()
+            
+            plt.title("Beam divergence vs Reynolds Number")
+            plt.errorbar(x=reyn, y=spreadB, fmt='ro')
+            plt.xlabel("Reynolds Number")
+            plt.ylabel("Beam divergence (degree)")
+            plt.show()
+            plt.clf()
+            
+            
+        elif overlap == True:
+            
+            colorlist = ['ro','bo','go', 'co', 'mo', 'yo', 'ko']
+            colornum = -1
+            
+            for overlapfilename in overlap_filelist:
+                
+                colornum += 1
+            
+                directory = 'Data/'
+                f = np.loadtxt(directory+summaryfolder+'/'+overlapfilename, skiprows=1)
+
+                zs, frs, gammas, ext, sigE, vR, vRSig, vz, vzSig, spreads,\
+                thetas, thetaSig, times, timeSig, reyn, spreadB, medRads = f[:,0], f[:,1], f[:,2], \
+                f[:,3], f[:,4], f[:,5], f[:,6], f[:,7], f[:,8], f[:,9], \
+                f[:,10], f[:,11], f[:,12], f[:,13], f[:,14], f[:,15], f[:,16]
+
+                #print("Zs: {},\n frs: {},\n gammas: {},\n times: {}".format(zs,frs,gammas,times))
+
+                
+                
+
+                plt.figure(1)
+                plt.title("Pumpout Time vs Flowrate")
+                plt.errorbar(x=frs, y=times, yerr=timeSig, fmt=colorlist[colornum])
+                plt.xlabel("Flowrate (SCCM)")
+                plt.ylabel("Arrival time at z={} m".format(plane))
+                plt.legend(legendlist)
+                
+                plt.figure(2)
+                plt.title("Extraction Rate vs flowrate")
+                plt.errorbar(x=frs, y=ext, yerr=sigE,fmt=colorlist[colornum])
+                plt.xlabel("Flowrate (SCCM)")
+                plt.ylabel("Fraction Extracted")
+                plt.legend(legendlist)
+                
+
+                plt.figure(3)
+                plt.title("Median Forward Velocity vs Flowrate (SCCM)")
+                plt.errorbar(x=frs, y=vz, yerr=vzSig, fmt=colorlist[colornum])
+                plt.xlabel("Flowrate (SCCM)")
+                plt.ylabel("Median Forward Velocity (m/s)")
+                plt.legend(legendlist)
+                
+
+
+                plt.figure(4)
+                plt.title("Forward Velocity FWHM vs Flowrate (SCCM)")
+                plt.errorbar(x=frs, y=vzSig, fmt=colorlist[colornum])
+                plt.xlabel("Flowrate (SCCM)")
+                plt.ylabel("Forward Velocity St. Dev.")
+                plt.legend(legendlist)
+
+
+                plt.figure(5)
+                plt.title("Reynolds Number vs Flowrate")
+                plt.errorbar(x=frs, y=reyn, fmt=colorlist[colornum])
+                plt.ylabel("Reynolds Number")
+                plt.xlabel("Flowrate (SCCM)")
+                plt.legend(legendlist)
+
+                plt.figure(6)
+                plt.title("Median Forward Velocity vs Reynolds Number")
+                plt.errorbar(x=reyn, y=vz, fmt=colorlist[colornum])
+                plt.xlabel("Reynolds Number")
+                plt.ylabel("Median Forward Velocity")
+                plt.legend(legendlist)
+
+                plt.figure(7)
+                plt.title("Extraction Rate vs Reynolds Number")
+                plt.errorbar(x=reyn, y=ext, yerr=sigE, fmt=colorlist[colornum])
+                plt.xlabel("Reynolds Number")
+                plt.ylabel("Extraction Rate")
+                plt.legend(legendlist)
+
+                plt.figure(8)
+                plt.title("Beam divergence vs flowrate SCCM")
+                plt.errorbar(x=frs, y=spreadB, fmt=colorlist[colornum])
+                plt.xlabel("flowrate (SCCM)")
+                plt.ylabel("Beam divergence (degree)")
+                plt.legend(legendlist)
+
+                plt.figure(9)
+                plt.title("Beam divergence vs Reynolds Number")
+                plt.errorbar(x=reyn, y=spreadB, fmt=colorlist[colornum])
+                plt.xlabel("Reynolds Number")
+                plt.ylabel("Beam divergence (degree)")
+                plt.legend(legendlist)
+                
+            
+               
+                
+        
+
 
 
 

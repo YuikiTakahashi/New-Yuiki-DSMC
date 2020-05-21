@@ -10,6 +10,7 @@ Created on Tue Apr 14 19:18:26 2020
 import numpy as np
 import emcee
 import matplotlib.pyplot as plt
+import time
 from constants import *  
 
 def log_prob(u, relFlow, T):
@@ -43,28 +44,7 @@ def log_prob_approx(u, relFlow, T):
     polar = np.sin(theta)
     return np.log(MB * polar * r)
 
-def get_samples(f, rel, T):
-    ndim = 3
-    nwalkers = 32
-    p0u = np.random.rand(nwalkers) * 200
-    p0t = np.random.rand(nwalkers) * np.pi
-    p0p = np.random.rand(nwalkers) * 2 * np.pi
-    p0 = np.array([p0u.tolist(), p0t.tolist(), p0p.tolist()]).transpose()
-    
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, f, args=[rel, T])
-    
-    state = sampler.run_mcmc(p0, 1000)
-    sampler.reset()
-    
-    sampler.run_mcmc(state, 10000);
-    return sampler.get_chain(flat=True)
-
-def get_sample(f, rel, T, nwalkers=8, burn=400, n=1):
-    '''
-    Uses emcee to spit out a (u, theta, phi) ambient velocity vector.
-    Density plot tests showed that 400 burns is plenty. Can reduce to 100 if needed for speed.
-    Keep nwalkers > 2 * dim = 6.
-    '''
+def get_samples(T, rel=[0,0,0], f=log_prob, nwalkers=32, burn=500, n=2500):
     ndim = 3
     p0u = np.random.rand(nwalkers) * 200
     p0t = np.random.rand(nwalkers) * np.pi
@@ -76,6 +56,23 @@ def get_sample(f, rel, T, nwalkers=8, burn=400, n=1):
     state = sampler.run_mcmc(p0, burn)
     sampler.reset()
     
+    sampler.run_mcmc(state, n);
+    return sampler.get_chain(flat=True)
+
+def get_sample(T, rel=[0,0,0], f=log_prob, nwalkers=8, burn=400, n=1):
+    '''
+    Uses emcee to spit out a (u, theta, phi) ambient velocity vector.
+    Density plot tests showed that 400 burns is plenty. Can reduce to 100 if needed for speed.
+    Keep nwalkers > 2 * dim = 6.
+    '''
+    ndim = 3
+    p0u = np.random.rand(nwalkers) * 200
+    p0t = np.random.rand(nwalkers) * np.pi
+    p0p = np.random.rand(nwalkers) * 2 * np.pi
+    p0 = np.array([p0u.tolist(), p0t.tolist(), p0p.tolist()]).transpose()
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, f, args=[rel, T])
+    state = sampler.run_mcmc(p0, burn)
+    sampler.reset()
     sampler.run_mcmc(state, n);
     return sampler.get_chain(flat=True)[-1]
 
@@ -97,3 +94,4 @@ def compare_probs(rel, T):
         plt.legend(loc=2)
         plt.title("(%d, %d, %d) m/s YbOH Velocity Relative to Flow"%(rel[0], rel[1], rel[2]))
         
+

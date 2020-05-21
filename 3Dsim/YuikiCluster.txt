@@ -1,0 +1,5 @@
+import parSimClass_Yuiki4 as pcy
+for flowname in ['t002', 't010','tv2n','tv3n', 'tv10n','thalfv10n','thalfv25n']:
+    simObject = pcy.ParticleTracing_Yuiki(flowFieldName='flows/X_Cell/DS2'+ flowname + '.DAT', NPAR=5,INIT_COND=14,CORRECTION=3)
+    outfile='Data/TCellTesting_inicon14 4KHe newcollfre/'+ flowname + '.dat'
+    simObject.parallel_main(outfile); #Runs parallelized simulations in simObjectq!
